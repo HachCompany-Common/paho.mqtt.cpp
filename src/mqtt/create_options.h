@@ -6,7 +6,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 /*******************************************************************************
- * Copyright (c) 2020 Frank Pagliughi <fpagliughi@mindspring.com>
+ * Copyright (c) 2020-2023 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
@@ -112,7 +112,7 @@ public:
 	 * Sets the MQTT version used to create the client.
 	 * @param ver The MQTT version used to create the client.
 	 */
-	void set_mqtt_verison(int ver) { opts_.MQTTVersion = ver; }
+	void set_mqtt_version(int ver) { opts_.MQTTVersion = ver; }
 	/**
 	 * Whether the oldest messages are deleted when the output buffer is
 	 * full.
