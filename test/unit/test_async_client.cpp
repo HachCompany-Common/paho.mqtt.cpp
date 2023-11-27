@@ -8,11 +8,11 @@
  * Copyright (c) 2020 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License v2.0
  * and Eclipse Distribution License v1.0 which accompany this distribution.
  *
  * The Eclipse Public License is available at
- *    http://www.eclipse.org/legal/epl-v10.html
+ *    http://www.eclipse.org/legal/epl-v20.html
  * and the Eclipse Distribution License is available at
  *   http://www.eclipse.org/org/documents/edl-v10.php.
  *
@@ -22,7 +22,7 @@
  *******************************************************************************/
 #define UNIT_TESTS
 
-#include "catch2/catch.hpp"
+#include "catch2_version.h"
 #include "mqtt/iasync_client.h"
 #include "mqtt/async_client.h"
 #include "mock_persistence.h"
@@ -757,7 +757,7 @@ TEST_CASE("async_client subscribe many topics 2 args failure", "[client]")
 		REQUIRE(token_sub);
 		token_sub->wait_for(TIMEOUT);
 	}
-	catch (const mqtt::exception& ex) {
+	catch (const mqtt::exception& /*ex*/) {
 		//REQUIRE(MQTTASYNC_BAD_QOS == ex.get_return_code());
 	}
 
@@ -805,7 +805,7 @@ TEST_CASE("async_client subscribe many topics 4 args failure", "[client]")
 	try {
 		cli.subscribe(TOPIC_COLL, BAD_QOS_COLL, &CONTEXT, listener)->wait_for(TIMEOUT);
 	}
-	catch (const mqtt::exception& ex) {
+	catch (const mqtt::exception& /*ex*/) {
 		//REQUIRE(MQTTASYNC_BAD_QOS == ex.get_return_code());
 	}
 
@@ -979,3 +979,10 @@ TEST_CASE("async_client unsubscribe many topics 3 args failure", "[client]")
 	REQUIRE(MQTTASYNC_DISCONNECTED == return_code);
 }
 
+TEST_CASE("async_client consumer timeout", "[client]")
+{
+	// This just compiling shows #343 fixed.
+	async_client cli{GOOD_SERVER_URI, CLIENT_ID};
+	cli.start_consuming();
+	cli.try_consume_message_until(std::chrono::steady_clock::now());
+}

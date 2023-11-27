@@ -8,11 +8,11 @@
  * Copyright (c) 2020 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License v2.0
  * and Eclipse Distribution License v1.0 which accompany this distribution.
  *
  * The Eclipse Public License is available at
- *    http://www.eclipse.org/legal/epl-v10.html
+ *    http://www.eclipse.org/legal/epl-v20.html
  * and the Eclipse Distribution License is available at
  *   http://www.eclipse.org/org/documents/edl-v10.php.
  *
@@ -26,7 +26,7 @@
 
 #define UNIT_TESTS
 
-#include "catch2/catch.hpp"
+#include "catch2_version.h"
 #include "mqtt/client.h"
 #include "mock_persistence.h"
 #include "mock_callback.h"
@@ -436,7 +436,7 @@ TEST_CASE("client subscribe many topics 2 args failure", "[client]")
 	try {
 		cli.subscribe(TOPIC_COLL, BAD_QOS_COLL);
 	}
-	catch (std::invalid_argument& ex) {}
+	catch (std::invalid_argument&) {}
 
 	int return_code = MQTTASYNC_SUCCESS;
 	try {

@@ -4,11 +4,11 @@
  * Copyright (c) 2019 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License v2.0
  * and Eclipse Distribution License v1.0 which accompany this distribution.
  *
  * The Eclipse Public License is available at
- *    http://www.eclipse.org/legal/epl-v10.html
+ *    http://www.eclipse.org/legal/epl-v20.html
  * and the Eclipse Distribution License is available at
  *   http://www.eclipse.org/org/documents/edl-v10.php.
  *
@@ -154,17 +154,36 @@ property& property::operator=(property&& rhs)
 
 /////////////////////////////////////////////////////////////////////////////
 
-properties::properties(std::initializer_list<property> props)
+PAHO_MQTTPP_EXPORT const MQTTProperties properties::DFLT_C_STRUCT
+    = MQTTProperties_initializer;
+
+properties::properties() : props_{DFLT_C_STRUCT}
 {
-	std::memset(&props_, 0, sizeof(properties));
+}
+
+properties::properties(std::initializer_list<property> props) : props_{DFLT_C_STRUCT}
+{
 	for (const auto& prop : props)
 		::MQTTProperties_add(&props_, &prop.c_struct());
 }
 
-void properties::clear()
+properties& properties::operator=(const properties& rhs)
 {
-	::MQTTProperties_free(&props_);
-	memset(&props_, 0, sizeof(MQTTProperties));
+	if (&rhs != this) {
+		::MQTTProperties_free(&props_);
+		props_ = ::MQTTProperties_copy(&rhs.props_);
+	}
+	return *this;
+}
+
+properties& properties::operator=(properties&& rhs)
+{
+	if (&rhs != this) {
+		::MQTTProperties_free(&props_);
+		props_ = rhs.props_;
+		rhs.props_ = DFLT_C_STRUCT;
+	}
+	return *this;
 }
 
 property properties::get(property::code propid, size_t idx /*=0*/)

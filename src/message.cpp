@@ -1,14 +1,14 @@
 // message.cpp
 
 /*******************************************************************************
- * Copyright (c) 2013-2020 Frank Pagliughi <fpagliughi@mindspring.com>
+ * Copyright (c) 2013-2023 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License v2.0
  * and Eclipse Distribution License v1.0 which accompany this distribution.
  *
  * The Eclipse Public License is available at
- *    http://www.eclipse.org/legal/epl-v10.html
+ *    http://www.eclipse.org/legal/epl-v20.html
  * and the Eclipse Distribution License is available at
  *   http://www.eclipse.org/org/documents/edl-v10.php.
  *
@@ -25,12 +25,10 @@ namespace mqtt {
 
 /////////////////////////////////////////////////////////////////////////////
 
-#if __cplusplus < 201703L
-	constexpr int message::DFLT_QOS;
-	constexpr bool message::DFLT_RETAINED;
-#endif
+PAHO_MQTTPP_EXPORT const int message::DFLT_QOS = 0;
+PAHO_MQTTPP_EXPORT const bool message::DFLT_RETAINED = false;
 
-const MQTTAsync_message message::DFLT_C_STRUCT = MQTTAsync_message_initializer;
+PAHO_MQTTPP_EXPORT const MQTTAsync_message message::DFLT_C_STRUCT = MQTTAsync_message_initializer;
 
 // --------------------------------------------------------------------------
 

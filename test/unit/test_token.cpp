@@ -8,11 +8,11 @@
  * Copyright (c) 2016-2020 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License v2.0
  * and Eclipse Distribution License v1.0 which accompany this distribution.
  *
  * The Eclipse Public License is available at
- *    http://www.eclipse.org/legal/epl-v10.html
+ *    http://www.eclipse.org/legal/epl-v20.html
  * and the Eclipse Distribution License is available at
  *   http://www.eclipse.org/org/documents/edl-v10.php.
  *
@@ -28,7 +28,7 @@
 #define UNIT_TESTS
 
 #include <cstring>
-#include "catch2/catch.hpp"
+#include "catch2_version.h"
 #include "mqtt/token.h"
 #include "mock_async_client.h"
 #include "mock_action_listener.h"
@@ -119,9 +119,9 @@ TEST_CASE("token on success with data", "[token]")
 	mqtt::token tok{TYPE, cli};
 
 	constexpr int MESSAGE_ID = 12;
-	MQTTAsync_successData data = {
-		.token = MESSAGE_ID,
-	};
+	MQTTAsync_successData data{};
+
+    data.token = MESSAGE_ID;
 	data.alt.connect.serverURI = const_cast<char*>("tcp://some_server.com");
 
 	REQUIRE(!tok.is_complete());
@@ -153,11 +153,12 @@ TEST_CASE("token on failure with data", "[token]")
 
 	REQUIRE(!tok.is_complete());
 	constexpr int MESSAGE_ID = 12;
-	MQTTAsync_failureData data = {
-		.token = MESSAGE_ID,
-		.code = 13,
-		.message = nullptr,
-	};
+	MQTTAsync_failureData data{};
+
+    data.token = MESSAGE_ID;
+    data.code = 13;
+    data.message = nullptr;
+
 	mock_async_client::fail(&tok, &data);
 	REQUIRE(tok.is_complete());
 	REQUIRE(MESSAGE_ID == tok.get_message_id());
@@ -270,11 +271,12 @@ TEST_CASE("token wait failure", "[token]")
 	// returns immediately. Otherwise we will get stuck in a single thread
 	// that can't change the complete flag.
 	constexpr int MESSAGE_ID = 12;
-	MQTTAsync_failureData data = {
-		.token = MESSAGE_ID,
-		.code = MQTTASYNC_FAILURE,
-		.message = nullptr,
-	};
+	MQTTAsync_failureData data{};
+
+    data.token = MESSAGE_ID;
+    data.code = MQTTASYNC_FAILURE;
+    data.message = nullptr;
+
 	mock_async_client::fail(&tok, &data);
 
 	REQUIRE(tok.is_complete());

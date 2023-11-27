@@ -7,11 +7,11 @@
  * Copyright (c) 2022 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License v2.0
  * and Eclipse Distribution License v1.0 which accompany this distribution.
  *
  * The Eclipse Public License is available at
- *    http://www.eclipse.org/legal/epl-v10.html
+ *    http://www.eclipse.org/legal/epl-v20.html
  * and the Eclipse Distribution License is available at
  *   http://www.eclipse.org/org/documents/edl-v10.php.
  *
@@ -21,7 +21,7 @@
 
 #define UNIT_TESTS
 
-#include "catch2/catch.hpp"
+#include "catch2_version.h"
 #include "mqtt/types.h"
 #include "mqtt/thread_queue.h"
 
@@ -52,7 +52,7 @@ TEST_CASE("que mt put/get", "[thread_queue]")
 	const size_t N = 1000000;
 	const size_t N_THR = 2;
 
-	auto producer = [&que]() {
+	auto producer = [&que, &N]() {
 		string s;
 		for (size_t i=0; i<512; ++i)
 			s.push_back('a' + i%26);
@@ -61,7 +61,7 @@ TEST_CASE("que mt put/get", "[thread_queue]")
 			que.put(s);
 	};
 
-	auto consumer = [&que]() {
+	auto consumer = [&que, &N]() {
 		string s;
 		bool ok = true;
 		for (size_t i=0; i<N && ok; ++i) {

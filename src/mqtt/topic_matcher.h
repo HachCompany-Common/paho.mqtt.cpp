@@ -9,11 +9,11 @@
  * Copyright (c) 2022 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License v2.0
  * and Eclipse Distribution License v1.0 which accompany this distribution.
  *
  * The Eclipse Public License is available at
- *    http://www.eclipse.org/legal/epl-v10.html
+ *    http://www.eclipse.org/legal/epl-v20.html
  * and the Eclipse Distribution License is available at
  *   http://www.eclipse.org/org/documents/edl-v10.php.
  *
@@ -31,42 +31,6 @@
 #include <forward_list>
 #include <initializer_list>
 #include <memory>
-
-// The make_unique<>() template functions from the original std proposal:
-//  https://isocpp.org/files/papers/N3656.txt
-
-#if __cplusplus < 201402L
-namespace std {
-    template<class T> struct _Unique_if {
-        typedef unique_ptr<T> _Single_object;
-    };
-
-    template<class T> struct _Unique_if<T[]> {
-        typedef unique_ptr<T[]> _Unknown_bound;
-    };
-
-    template<class T, size_t N> struct _Unique_if<T[N]> {
-        typedef void _Known_bound;
-    };
-
-    template<class T, class... Args>
-        typename _Unique_if<T>::_Single_object
-        make_unique(Args&&... args) {
-            return unique_ptr<T>(new T(std::forward<Args>(args)...));
-        }
-
-    template<class T>
-        typename _Unique_if<T>::_Unknown_bound
-        make_unique(size_t n) {
-            typedef typename remove_extent<T>::type U;
-            return unique_ptr<T>(new U[n]());
-        }
-
-    template<class T, class... Args>
-        typename _Unique_if<T>::_Known_bound
-        make_unique(Args&&...) = delete;
-}
-#endif
 
 namespace mqtt {
 
@@ -134,7 +98,9 @@ private:
 		map_t children;
 
 		static ptr_t create() {
-			return std::make_unique<node>();
+            // TODO: When available (C++14,17) use
+            // std::make_unique<node>();
+			return std::unique_ptr<node>(new node{});
 		}
 	};
 	using node_ptr = typename node::ptr_t;
@@ -356,7 +322,9 @@ public:
 			}
 			nd = it->second.get();
 		}
-		nd->content = std::make_unique<value_type>(std::move(val));
+        // TODO: When available (C++14,17) use:
+        //   std::make_unique<value_type>(std::move(val));
+		nd->content = std::unique_ptr<value_type>(new value_type{std::move(val)});
 	}
 	/**
 	 * Inserts a new value into the collection.

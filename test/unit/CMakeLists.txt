@@ -4,14 +4,14 @@
 #
 
 #*******************************************************************************
-# Copyright (c) 2019 Frank Pagliughi <fpagliughi@mindspring.com>
+# Copyright (c) 2019-2023 Frank Pagliughi <fpagliughi@mindspring.com>
 #
 #  All rights reserved. This program and the accompanying materials
-#  are made available under the terms of the Eclipse Public License v1.0
+#  are made available under the terms of the Eclipse Public License v2.0
 #  and Eclipse Distribution License v1.0 which accompany this distribution. 
 # 
 #  The Eclipse Public License is available at 
-#     http://www.eclipse.org/legal/epl-v10.html
+#     http://www.eclipse.org/legal/epl-v20.html
 #  and the Eclipse Distribution License is available at 
 #    http://www.eclipse.org/org/documents/edl-v10.php.
 # 
@@ -19,12 +19,15 @@
 #     Frank Pagliughi - Initial implementation
 #*******************************************************************************/
 
+# --- Find Catch2 and figure out which major version ---
+
 find_package(Catch2 REQUIRED)
 
-# --- For apps that use threads ---
+message(STATUS "Found Catch2 v${Catch2_VERSION}")
 
-#set(THREADS_PREFER_PTHREAD_FLAG ON)
-#find_package(Threads REQUIRED)
+if (Catch2_VERSION VERSION_LESS "2.0")
+  message(FATAL "Catch2 v2.0 or greater required for tests")
+endif()
 
 # --- Executables ---
 
@@ -35,13 +38,13 @@ add_executable(unit_tests unit_tests.cpp
   test_connect_options.cpp
   test_create_options.cpp
   test_disconnect_options.cpp
-	test_exception.cpp
+  test_exception.cpp
   test_message.cpp
   test_persistence.cpp
   test_properties.cpp
   test_response_options.cpp
   test_string_collection.cpp
-	test_thread_queue.cpp
+  test_thread_queue.cpp
   test_token.cpp
   test_topic.cpp
   test_topic_matcher.cpp
@@ -54,12 +57,23 @@ if(PAHO_WITH_SSL)
   )
 endif()
 
+if (Catch2_VERSION VERSION_LESS "3.0")
+    target_compile_definitions(unit_tests PUBLIC CATCH2_V2)
+endif()
+
 # --- Link for executables ---
 
 message(STATUS "Using library for unit tests: ${PAHO_CPP_LIB}")
 
-# .. Threads::Threads)
 target_link_libraries(unit_tests ${PAHO_CPP_LIB} Catch2::Catch2)
+
+if(PAHO_BUILD_SHARED)
+  target_compile_definitions(unit_tests PUBLIC PAHO_MQTTPP_IMPORTS)
+
+  if(MSVC AND PAHO_BUILD_STATIC)
+    target_link_libraries(unit_tests ${LIBS_SYSTEM})
+  endif()
+endif()
 
 include(CTest)
 include(Catch)

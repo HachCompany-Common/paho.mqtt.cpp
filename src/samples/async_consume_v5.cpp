@@ -1,4 +1,4 @@
-// async_consume.cpp
+// async_consume_v5.cpp
 //
 // This is a Paho MQTT C++ client, sample application.
 //
@@ -7,9 +7,9 @@
 // and status updates.
 //
 // The sample demonstrates:
-//  - Connecting to an MQTT server/broker.
+//  - Connecting to an MQTT v5 server/broker.
 //  - Subscribing to a topic
-//  - Receiving messages through the synchronous queuing API
+//  - Receiving messages through the consuming (queuing) API
 //
 
 /*******************************************************************************
@@ -40,7 +40,7 @@
 using namespace std;
 
 const string SERVER_ADDRESS	{ "mqtt://localhost:1883" };
-const string CLIENT_ID		{ "paho_cpp_async_consume" };
+const string CLIENT_ID		{ "PahoCppAsyncConsumeV5" };
 const string TOPIC 			{ "hello" };
 
 const int  QOS = 1;
@@ -49,13 +49,26 @@ const int  QOS = 1;
 
 int main(int argc, char* argv[])
 {
-	mqtt::async_client cli(SERVER_ADDRESS, CLIENT_ID);
+	// Create a client using MQTT v5
+	mqtt::create_options createOpts(MQTTVERSION_5);
+	mqtt::async_client cli(SERVER_ADDRESS, CLIENT_ID, createOpts);
 
 	auto connOpts = mqtt::connect_options_builder()
+		.properties({
+			{mqtt::property::SESSION_EXPIRY_INTERVAL, 604800}
+	    })
 		.clean_session(false)
 		.finalize();
 
 	try {
+		cli.set_connection_lost_handler([](const std::string&) {
+			cout << "*** Connection Lost ***" << endl;
+		});
+
+		cli.set_disconnected_handler([](const mqtt::properties&, mqtt::ReasonCode reason) {
+			cout << "*** Disconnected. Reason: " << reason << " ***" << endl;
+		});
+
 		// Start consumer before connecting to make sure to not miss messages
 
 		cli.start_consuming();
@@ -69,11 +82,19 @@ int main(int argc, char* argv[])
 		// connection to complete.
 		auto rsp = tok->get_connect_response();
 
+		// Make sure we were granted a v5 connection.
+		if (rsp.get_mqtt_version() < MQTTVERSION_5) {
+			cout << "Did not get an MQTT v5 connection." << endl;
+			exit(1);
+		}
+
 		// If there is no session present, then we need to subscribe, but if
 		// there is a session, then the server remembers us and our
 		// subscriptions.
-		if (!rsp.is_session_present())
+		if (!rsp.is_session_present()) {
+			cout << "Session not present on broker. Subscribing." << endl;
 			cli.subscribe(TOPIC, QOS)->wait();
+		}
 
 		cout << "OK" << endl;
 
@@ -94,7 +115,6 @@ int main(int argc, char* argv[])
 
 		if (cli.is_connected()) {
 			cout << "\nShutting down and disconnecting from the MQTT server..." << flush;
-			cli.unsubscribe(TOPIC)->wait();
 			cli.stop_consuming();
 			cli.disconnect()->wait();
 			cout << "OK" << endl;

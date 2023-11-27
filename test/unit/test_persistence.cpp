@@ -8,11 +8,11 @@
  * Copyright (c) 2020 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License v2.0
  * and Eclipse Distribution License v1.0 which accompany this distribution.
  *
  * The Eclipse Public License is available at
- *    http://www.eclipse.org/legal/epl-v10.html
+ *    http://www.eclipse.org/legal/epl-v20.html
  * and the Eclipse Distribution License is available at
  *   http://www.eclipse.org/org/documents/edl-v10.php.
  *
@@ -24,7 +24,7 @@
 #define UNIT_TESTS
 
 #include <cstring>
-#include "catch2/catch.hpp"
+#include "catch2_version.h"
 #include "mqtt/iclient_persistence.h"
 #include "mock_persistence.h"
 
@@ -54,8 +54,8 @@ TEST_CASE("persistence", "[persistence]")
 {
 	dcp per_;
 	void* handle_;
+	void* context = dynamic_cast<iclient_persistence*>(&per_);
 
-	void* context = static_cast<void*>(&per_);
 	dcp::persistence_open(&handle_, CLIENT_ID, SERVER_URI, context);
 
 	// Put no buffer
@@ -69,13 +69,14 @@ TEST_CASE("persistence", "[persistence]")
 	SECTION("test persistence open") {
 		dcp per;
 		void* handle = nullptr;
+		void* context = dynamic_cast<iclient_persistence*>(&per);
 
 		REQUIRE(MQTTCLIENT_PERSISTENCE_ERROR ==
 				dcp::persistence_open(&handle, CLIENT_ID, SERVER_URI, nullptr));
 
 		REQUIRE(MQTTASYNC_SUCCESS ==
-				dcp::persistence_open(&handle, CLIENT_ID, SERVER_URI, &per));
-		REQUIRE(handle == static_cast<void*>(&per));
+				dcp::persistence_open(&handle, CLIENT_ID, SERVER_URI, context));
+		REQUIRE(handle == context);
 	}
 
 
@@ -89,11 +90,11 @@ TEST_CASE("persistence", "[persistence]")
 		REQUIRE(MQTTCLIENT_PERSISTENCE_ERROR ==
 				dcp::persistence_close(nullptr));
 
-		void* context = static_cast<void*>(&per);
+		void* context = dynamic_cast<iclient_persistence*>(&per);
 		void* handle = nullptr;
 		dcp::persistence_open(&handle, CLIENT_ID, SERVER_URI, context);
 
-		REQUIRE(MQTTASYNC_SUCCESS == dcp::persistence_close(handle));
+ 		REQUIRE(MQTTASYNC_SUCCESS == dcp::persistence_close(handle));
 	}
 
     // ----------------------------------------------------------------------
@@ -103,7 +104,7 @@ TEST_CASE("persistence", "[persistence]")
     SECTION("test persistence put 0 buffer") {
     	dcp per;
     	void* handle;
-    	dcp::persistence_open(&handle, CLIENT_ID, SERVER_URI, &per);
+    	dcp::persistence_open(&handle, CLIENT_ID, SERVER_URI, dynamic_cast<iclient_persistence*>(&per));
 
     	// Put no buffer
     	int bufcount = 0;
@@ -118,7 +119,7 @@ TEST_CASE("persistence", "[persistence]")
     SECTION("persistence put 1 buffer") {
     	dcp per;
     	void* handle;
-    	dcp::persistence_open(&handle, CLIENT_ID, SERVER_URI, &per);
+    	dcp::persistence_open(&handle, CLIENT_ID, SERVER_URI, dynamic_cast<iclient_persistence*>(&per));
 
     	// Put no buffer
     	int bufcount = 1;
@@ -137,7 +138,7 @@ TEST_CASE("persistence", "[persistence]")
     SECTION("test persistence put 2 buffers") {
     	dcp per;
     	void* handle;
-    	dcp::persistence_open(&handle, CLIENT_ID, SERVER_URI, &per);
+    	dcp::persistence_open(&handle, CLIENT_ID, SERVER_URI, dynamic_cast<iclient_persistence*>(&per));
 
     	// Put no buffer
     	int bufcount = 2;
@@ -163,8 +164,8 @@ TEST_CASE("persistence", "[persistence]")
     SECTION("test persistence put empty buffers") {
     	dcp per;
     	void* handle;
-    	dcp::persistence_open(&handle, CLIENT_ID, SERVER_URI, &per);
-
+    	dcp::persistence_open(&handle, CLIENT_ID, SERVER_URI, dynamic_cast<iclient_persistence*>(&per));
+		
     	// Put three empty buffers
     	int bufcount = 3;
     	const char* buffers[] = { "", "", "" };
@@ -188,12 +189,12 @@ TEST_CASE("persistence", "[persistence]")
     	REQUIRE(MQTTASYNC_SUCCESS ==
     			dcp::persistence_get(handle_, const_cast<char*>(KEY), &buf, &buflen));
 
-    	int n = PAYLOAD_LEN + PAYLOAD2_LEN + PAYLOAD3_LEN;
+    	size_t n = PAYLOAD_LEN + PAYLOAD2_LEN + PAYLOAD3_LEN;
     	string str{PAYLOAD};
     	str += PAYLOAD2;
     	str += PAYLOAD3;
 
-    	REQUIRE(n == buflen);
+    	REQUIRE(int(n) == buflen);
     	REQUIRE(buf != nullptr);
     	REQUIRE(memcmp(str.data(), buf, n) == 0);
     }
@@ -250,5 +251,3 @@ TEST_CASE("persistence", "[persistence]")
 	dcp::persistence_clear(handle_);
 	dcp::persistence_close(handle_);
 }
-
-

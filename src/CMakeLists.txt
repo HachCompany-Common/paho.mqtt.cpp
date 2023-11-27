@@ -7,14 +7,14 @@
 
 #*******************************************************************************
 # Copyright (c) 2016-2017, Guilherme Maciel Ferreira
-# Copyright (c) 2017-2018, Frank Pagliughi
+# Copyright (c) 2017-2023, Frank Pagliughi
 #
 #  All rights reserved. This program and the accompanying materials
-#  are made available under the terms of the Eclipse Public License v1.0
+#  are made available under the terms of the Eclipse Public License v2.0
 #  and Eclipse Distribution License v1.0 which accompany this distribution. 
 # 
 #  The Eclipse Public License is available at 
-#     http://www.eclipse.org/legal/epl-v10.html
+#     http://www.eclipse.org/legal/epl-v20.html
 #  and the Eclipse Distribution License is available at 
 #    http://www.eclipse.org/org/documents/edl-v10.php.
 # 
@@ -22,10 +22,6 @@
 #     Guilherme Maciel Ferreira - initial version
 #     Frank Pagliughi - made the shared library optional
 #*******************************************************************************/
-
-if (NOT TARGET PahoMqttC::PahoMqttC)
-    find_package(PahoMqttC REQUIRED)
-endif()
 
 # --- The headers ---
 
@@ -36,14 +32,9 @@ add_subdirectory(mqtt)
 set (THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-#set(LIBS_SYSTEM Threads::Threads)
-#if(WIN32)
-#    string(APPEND LIBS_SYSTEM " ws2_32")
-#endif()
-
 ## --- Use object library to optimize compilation ---
 
-add_library(paho-cpp-objs OBJECT
+set(COMMON_SRC
   async_client.cpp
   client.cpp
   connect_options.cpp
@@ -61,96 +52,67 @@ add_library(paho-cpp-objs OBJECT
   will_options.cpp
 )
 
-## install the shared library
-#install(TARGETS paho-cpp-objs EXPORT PahoMqttCpp
-#    OBJECTS DESTINATION ${CMAKE_INSTALL_LIBDIR}
-#)
-
-# Object libraries can't use target_link_libraries in order to take advantage
-# of transitive usage requirements until CMake 3.12. This is a workaround:
-#target_include_directories(OBJS PRIVATE ${PAHO_MQTT_C_INCLUDE_DIRS})
-
-target_include_directories(paho-cpp-objs 
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-        $<INSTALL_INTERFACE:include>
-    PRIVATE 
-        ${PAHO_MQTT_C_INCLUDE_DIRS}
-        src
-)
-
-# --- Warnings ---
-
-# Maybe set '-Werror' for Release builds?
-target_compile_options(paho-cpp-objs PRIVATE
-  $<$<CXX_COMPILER_ID:MSVC>:/W3>
-  $<$<CXX_COMPILER_ID:Clang>:-Wall -Wextra -Wdocumentation>
-  $<$<NOT:$<CXX_COMPILER_ID:MSVC,Clang>>:-Wall -Wextra>
-)
-
 ## --- Build the shared library, if requested ---
 
 if(PAHO_BUILD_SHARED)
-    ## create the shared library
-    add_library(paho-mqttpp3 SHARED $<TARGET_OBJECTS:paho-cpp-objs>)
+    ## Create the shared library
+    add_library(paho-mqttpp3 SHARED ${COMMON_SRC})
+    list(APPEND PAHO_CPP_TARGETS paho-mqttpp3)
 
-    ## add dependencies to the shared library
-    target_link_libraries(paho-mqttpp3
-        PRIVATE ${LIBS_SYSTEM}
-        PUBLIC PahoMqttC::PahoMqttC Threads::Threads)
-
-    # It would be nice to exort the include paths from the obj lib, but we
-    # get an export error. Perhaps in a future version?
-    # 
-    # CMake Error: install(EXPORT "PahoMqttCpp" ...) includes target "paho-mqttpp3"
-    #   which requires target "paho-cpp-objs" that is not in the export set.
-
-    #target_include_directories(paho-mqttpp3 PUBLIC 
-    #    $<TARGET_PROPERTY:paho-cpp-objs,INCLUDE_DIRECTORIES>
-    #)
-
-    target_include_directories(paho-mqttpp3 PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-        $<INSTALL_INTERFACE:include>
+    ## Add dependencies to the shared library
+    target_link_libraries(paho-mqttpp3 PUBLIC
+      eclipse-paho-mqtt-c::paho-mqtt3as
+      ${PAHO_MQTT_C_LIB}
+      Threads::Threads
     )
 
     ## set the shared library soname
     set_target_properties(paho-mqttpp3 PROPERTIES
         VERSION ${PROJECT_VERSION}
-        SOVERSION ${PROJECT_VERSION_MAJOR})
-
-    ## install the shared library
-    install(TARGETS paho-mqttpp3 EXPORT PahoMqttCpp
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+    )
 endif()
 
 ## --- Build static version of the library, if requested ---
 
 if(PAHO_BUILD_STATIC)
     ## create the static library
-    add_library(paho-mqttpp3-static STATIC $<TARGET_OBJECTS:paho-cpp-objs>)
+    add_library(paho-mqttpp3-static STATIC ${COMMON_SRC})
+    list(APPEND PAHO_CPP_TARGETS paho-mqttpp3-static)
 
     ## add dependencies to the shared library
-    target_link_libraries(paho-mqttpp3-static
-        PRIVATE ${LIBS_SYSTEM}
-        PUBLIC PahoMqttC::PahoMqttC Threads::Threads)
-
-    target_include_directories(paho-mqttpp3-static PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-        $<INSTALL_INTERFACE:include>
+    target_link_libraries(paho-mqttpp3-static PUBLIC 
+      ${PAHO_MQTT_C_LIB}
+      Threads::Threads
     )
 
-    ## install the static library
-    install(TARGETS paho-mqttpp3-static EXPORT PahoMqttCpp
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-
-    ## Let the archive use the same name as the shared lib on *nix systems
+    ## Let the archive use the same base name as the shared lib on *nix systems
     if(UNIX)
         set_target_properties(paho-mqttpp3-static PROPERTIES OUTPUT_NAME paho-mqttpp3)
     endif()
 endif()
 
+## --- Set common properties, etc ---
 
+include(GNUInstallDirs)
+
+foreach(TARGET ${PAHO_CPP_TARGETS})
+  ## Warnings
+  target_compile_options(${TARGET} PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/W3>
+    $<$<CXX_COMPILER_ID:Clang>:-Wall -Wextra -Wdocumentation>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC,Clang>>:-Wall -Wextra>
+  )
+
+  target_include_directories(${TARGET} PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+      $<INSTALL_INTERFACE:include>
+  )
+
+  ## install the shared library
+  install(TARGETS ${TARGET} EXPORT PahoMqttCpp
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
+endforeach()

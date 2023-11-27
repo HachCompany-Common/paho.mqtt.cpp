@@ -9,11 +9,11 @@
  * Copyright (c) 2013-2016 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License v2.0
  * and Eclipse Distribution License v1.0 which accompany this distribution.
  *
  * The Eclipse Public License is available at
- *    http://www.eclipse.org/legal/epl-v10.html
+ *    http://www.eclipse.org/legal/epl-v20.html
  * and the Eclipse Distribution License is available at
  *   http://www.eclipse.org/org/documents/edl-v10.php.
  *
@@ -425,6 +425,31 @@ public:
 	virtual token_ptr unsubscribe(const string& topicFilter,
 								  void* userContext, iaction_listener& cb,
 								  const properties& props=properties()) =0;
+	/**
+	 * Start consuming messages.
+	 * This initializes the client to receive messages through a queue that
+	 * can be read synchronously.
+	 */
+	virtual void start_consuming() =0;
+	/**
+	 * Stop consuming messages.
+	 * This shuts down the internal callback and discards any unread
+	 * messages.
+	 */
+	virtual void stop_consuming() =0;
+	/**
+	 * Read the next message from the queue.
+	 * This blocks until a new message arrives.
+	 * @return The message and topic.
+	 */
+	virtual const_message_ptr consume_message() =0;
+	/**
+	 * Try to read the next message from the queue without blocking.
+	 * @param msg Pointer to the value to receive the message
+	 * @return @em true is a message was read, @em false if no message was
+	 *  	   available.
+	 */
+	virtual bool try_consume_message(const_message_ptr* msg) =0;
 };
 
 /////////////////////////////////////////////////////////////////////////////

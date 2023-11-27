@@ -4,11 +4,11 @@
  * Copyright (c) 2013-2022 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License v2.0
  * and Eclipse Distribution License v1.0 which accompany this distribution.
  *
  * The Eclipse Public License is available at
- *    http://www.eclipse.org/legal/epl-v10.html
+ *    http://www.eclipse.org/legal/epl-v20.html
  * and the Eclipse Distribution License is available at
  *   http://www.eclipse.org/org/documents/edl-v10.php.
  *
@@ -193,6 +193,10 @@ void async_client::on_disconnected(void* context, MQTTProperties* cprops,
 			properties props(*cprops);
 			disconnectedHandler(props, ReasonCode(reasonCode));
 		}
+
+		consumer_queue_type& que = cli->que_;
+		if (que)
+			que->put(const_message_ptr{});
 	}
 }
 
@@ -232,32 +236,6 @@ int async_client::on_message_arrived(void* context, char* topicName, int topicLe
 	// The Java version does doesn't seem to...
 	return to_int(true);
 }
-
-// Callback to indicate that a message was delivered to the server.
-// It is called for a message with a QOS >= 1, but it happens before the
-// on_success() call for the token. Thus we don't have the underlying
-// MQTTAsync_token of the outgoing message at the time of this callback.
-//
-// *** So using the Async C library we have no way to match this msgID with
-//     a delivery_token object. So this is useless to us.
-//
-// So, all in all, this callback in it's current implementation seems rather
-// redundant.
-//
-#if 0
-void async_client::on_delivery_complete(void* context, MQTTAsync_token msgID)
-{
-	if (context) {
-		async_client* m = static_cast<async_client*>(context);
-		callback* cb = m->get_callback();
-		if (cb) {
-			delivery_token_ptr tok = m->get_pending_delivery_token(msgID);
-			cb->delivery_complete(tok);
-		}
-	}
-}
-#endif
-
 
 // Callback from the C lib for when a registered updateConnectOptions
 // needs to be called.
@@ -299,7 +277,6 @@ int async_client::on_update_connection(void* context,
 	}
 	return 0;	// false
 }
-
 
 // --------------------------------------------------------------------------
 // Private methods
@@ -437,7 +414,7 @@ void async_client::set_update_connection_handler(update_connection_handler cb)
 
 token_ptr async_client::connect()
 { 
-	return connect(connect_options());
+	return connect(connect_options{});
 }
 
 token_ptr async_client::connect(connect_options opts)
@@ -470,7 +447,8 @@ token_ptr async_client::connect(connect_options opts)
 
 	opts.set_token(connTok_);
 
-	int rc = MQTTAsync_connect(cli_, &opts.opts_);
+	connOpts_ = std::move(opts);
+	int rc = MQTTAsync_connect(cli_, &connOpts_.opts_);
 
 	if (rc != MQTTASYNC_SUCCESS) {
 		remove_token(connTok_);
@@ -504,7 +482,8 @@ token_ptr async_client::connect(connect_options opts, void* userContext,
 
 	opts.set_token(connTok_);
 
-	int rc = MQTTAsync_connect(cli_, &opts.opts_);
+	connOpts_ = std::move(opts);
+	int rc = MQTTAsync_connect(cli_, &connOpts_.opts_);
 
 	if (rc != MQTTASYNC_SUCCESS) {
 		remove_token(connTok_);

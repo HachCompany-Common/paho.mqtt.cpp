@@ -9,11 +9,11 @@
  * Copyright (c) 2013-2020 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License v2.0
  * and Eclipse Distribution License v1.0 which accompany this distribution.
  *
  * The Eclipse Public License is available at
- *    http://www.eclipse.org/legal/epl-v10.html
+ *    http://www.eclipse.org/legal/epl-v20.html
  * and the Eclipse Distribution License is available at
  *   http://www.eclipse.org/org/documents/edl-v10.php.
  *
@@ -32,6 +32,7 @@
 #include "mqtt/string_collection.h"
 #include "mqtt/will_options.h"
 #include "mqtt/ssl_options.h"
+#include "mqtt/platform.h"
 #include <vector>
 #include <map>
 #include <chrono>
@@ -46,11 +47,17 @@ namespace mqtt {
  */
 class connect_options
 {
-	/** The default C struct */
-	static const MQTTAsync_connectOptions DFLT_C_STRUCT;
+	/** The default C struct for non-WebSocket connections */
+	PAHO_MQTTPP_EXPORT static const MQTTAsync_connectOptions DFLT_C_STRUCT;
 
-	/** The default C struct for MQTT v5 */
-	static const MQTTAsync_connectOptions DFLT_C_STRUCT5;
+	/** The default C struct for non-Websocket MQTT v5 connections */
+	PAHO_MQTTPP_EXPORT static const MQTTAsync_connectOptions DFLT_C_STRUCT5;
+
+	/** The default C struct for WebSocket connections */
+	PAHO_MQTTPP_EXPORT static const MQTTAsync_connectOptions DFLT_C_STRUCT_WS;
+
+	/** The default C struct for Websocket MQTT v5 connections */
+	PAHO_MQTTPP_EXPORT static const MQTTAsync_connectOptions DFLT_C_STRUCT5_WS;
 
 	/** The underlying C connection options */
 	MQTTAsync_connectOptions opts_;
@@ -109,6 +116,12 @@ class connect_options
 	 */
 	void update_c_struct();
 
+	/**
+	 * Creates the options from a C option struct.
+	 * @param copts The C options struct.
+	 */
+	connect_options(const MQTTAsync_connectOptions& copts) : opts_(copts) {}
+
 public:
 	/** Smart/shared pointer to an object of this class. */
 	using ptr_t = std::shared_ptr<connect_options>;
@@ -141,6 +154,38 @@ public:
 	 * @param opt Another object to move into this new one.
 	 */
 	connect_options(connect_options&& opt);
+	/**
+	 * Creates default options for an MQTT v3.x connection.
+	 * @return Default options for an MQTT v3.x connection.
+	 */
+	static connect_options v3();
+	/**
+	 * Creates default options for an MQTT v5 connection.
+	 * @return Default options for an MQTT v5 connection.
+	 */
+	static connect_options v5();
+	/**
+	 * Creates default options for an MQTT v3.x connection using WebSockets.
+	 *
+	 * The keepalive interval is set to 45 seconds to avoid webserver 60
+	 * second inactivity timeouts.
+	 *
+	 * @return Default options for an MQTT v3.x connection using websockets.
+	 */
+	static connect_options ws() {
+		return connect_options(DFLT_C_STRUCT_WS);
+	}
+	/**
+	 * Creates default options for an MQTT v5 connection using WebSockets.
+	 *
+	 * The keepalive interval is set to 45 seconds to avoid webserver 60
+	 * second inactivity timeouts.
+	 *
+	 * @return Default options for an MQTT v5 connection using websockets.
+	 */
+	static connect_options v5_ws() {
+		return connect_options(DFLT_C_STRUCT5_WS);
+	}
 	/**
 	 * Copy assignment.
 	 * @param opt Another object to copy.
@@ -300,7 +345,7 @@ public:
 	 * This will only take effect if the version is _already_ set to v3.x
 	 * (not v5).
 	 *
-	 * @param clean @em true if the server should remember state for the
+	 * @param clean @em true if the server should NOT remember state for the
 	 *  			client across reconnects, @em false otherwise.
 	 */
 	void set_clean_session(bool cleanSession);
@@ -314,7 +359,7 @@ public:
 	 *
 	 * This will only take effect if the MQTT version is set to v5
 	 *
-	 * @param clean @em true if the server should remember state for the
+	 * @param clean @em true if the server should NOT remember state for the
 	 *  			client across reconnects, @em false otherwise.
 	 */
 	void set_clean_start(bool cleanStart);
@@ -426,6 +471,12 @@ public:
 	  *   @li MQTTVERSION_3_1 (3) = only try version 3.1
 	  *   @li MQTTVERSION_3_1_1 (4) = only try version 3.1.1
 	  *   @li MQTTVERSION_5 (5) = only try version 5
+	  *
+	  * @deprecated It is preferable to create the options for the desired
+	  * version rather than using this function to change the version after
+	  * some parameters have already been set. If you do use this function,
+	  * call it before setting any other version-specific options. @sa
+	  * connect_options::v5()
 	  */
 	void set_mqtt_version(int mqttVersion);
 	/**
@@ -461,9 +512,12 @@ public:
 	 * Gets the connect properties.
 	 * @return A const reference to the properties for the connect.
 	 */
-	const properties& get_properties() const {
-		return props_;
-	}
+	const properties& get_properties() const { return props_; }
+	/**
+	 * Gets a mutable reference to the connect properties.
+	 * @return A reference to the properties for the connect.
+	 */
+	properties& get_properties() { return props_; }
 	/**
 	 * Sets the properties for the connect.
 	 * @param props The properties to place into the message.
@@ -519,11 +573,6 @@ public:
 	 *  			 proxy.
 	 */
 	void set_https_proxy(const string& httpsProxy);
-	/**
-	 * Gets a string representation of the object.
-	 * @return A string representation of the object.
-	 */
-	string to_string() const;
 };
 
 /** Smart/shared pointer to a connection options object. */
@@ -537,7 +586,7 @@ using connect_options_ptr = connect_options::ptr_t;
 class connect_data
 {
 	/** The default C struct */
-	static const MQTTAsync_connectData DFLT_C_STRUCT;
+	PAHO_MQTTPP_EXPORT static const MQTTAsync_connectData DFLT_C_STRUCT;
 
 	/** The underlying C connect data  */
 	MQTTAsync_connectData data_;
@@ -626,13 +675,64 @@ public:
 	using self = connect_options_builder;
 	/**
 	 * Default constructor.
+	 *
+	 * @param ver The MQTT version for the connection. Defaults to the most
+	 *  		  recent v3 supported by the server.
 	 */
 	explicit connect_options_builder(int ver=MQTTVERSION_DEFAULT) : opts_(ver) {}
 	/**
+	 * Copy constructor from an existing set of options.
+	 */
+	explicit connect_options_builder(const connect_options& opts) : opts_(opts) {}
+	/**
+	 * Move constructor from an existing set of options.
+	 */
+	explicit connect_options_builder(const connect_options&& opts) : opts_(std::move(opts)) {}
+	/**
+	 * Creates the default options builder for an MQTT v3.x connection.
+	 * @return An options builder for an MQTT v3.x connection.
+	 */
+	static connect_options_builder v3() {
+		return connect_options_builder{ connect_options::v3() };
+	}
+	/**
+	 * Creates the default options builder for an MQTT v5 connection.
+	 * @return An options builder for an MQTT v5 connection.
+	 */
+	static connect_options_builder v5() {
+		return connect_options_builder{ connect_options::v5() };
+	}
+	/**
+	 * Creates the default options builder for an MQTT v3.x connection using
+	 * WebSockets.
+	 *
+	 * The keepalive interval is set to 45 seconds to avoid webserver 60
+	 * second inactivity timeouts.
+	 *
+	 * @return An options builder for an MQTT v3.x connection using
+	 *  	   websockets.
+	 */
+	static connect_options_builder ws() {
+		return connect_options_builder{ connect_options::ws() };
+	}
+	/**
+	 * Creates the default options for an MQTT v5 connection using
+	 * WebSockets
+	 * .
+	 * The keepalive interval is set to 45 seconds to avoid webserver 60
+	 * second inactivity timeouts.
+	 *
+	 * @return An options builder for an MQTT v5 connection using
+	 *  	   websockets.
+	 */
+	static connect_options_builder v5_ws() {
+		return connect_options_builder{ connect_options::v5_ws() };
+	}
+	/**
 	 * Sets whether the server should remember state for the client across
 	 * reconnects. (MQTT v3.x only)
-	 * @param on @em true if the server should remember state for the client
-	 *  		 across reconnects, @em false otherwise.
+	 * @param on @em true if the server should NOT remember state for the
+	 *  		 client across reconnects, @em false otherwise.
 	 */
 	auto clean_session(bool on=true) -> self& {
 		opts_.set_clean_session(on);
@@ -761,6 +861,12 @@ public:
 	  *   @li MQTTVERSION_3_1 (3) = only try version 3.1
 	  *   @li MQTTVERSION_3_1_1 (4) = only try version 3.1.1
 	  *   @li MQTTVERSION_5 (5) = only try version 5
+	  *
+	  * @deprecated It is preferable to create the options builder for the
+	  * desired version rather than using this function to change the
+	  * version after some parameters have already been set. If you do use
+	  * this function, call it before setting any other version-specific
+	  * options. @sa connect_options_builder::v5()
 	  */
 	auto mqtt_version(int ver) -> self& {
 		opts_.set_mqtt_version(ver);

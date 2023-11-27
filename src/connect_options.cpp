@@ -5,11 +5,11 @@
  * Copyright (c) 2016 Guilherme M. Ferreira <guilherme.maciel.ferreira@gmail.com>
  *
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License v2.0
  * and Eclipse Distribution License v1.0 which accompany this distribution.
  *
  * The Eclipse Public License is available at
- *    http://www.eclipse.org/legal/epl-v10.html
+ *    http://www.eclipse.org/legal/epl-v20.html
  * and the Eclipse Distribution License is available at
  *   http://www.eclipse.org/org/documents/edl-v10.php.
  *
@@ -25,11 +25,19 @@ namespace mqtt {
 
 /////////////////////////////////////////////////////////////////////////////
 
-const MQTTAsync_connectOptions connect_options::DFLT_C_STRUCT =
+PAHO_MQTTPP_EXPORT const MQTTAsync_connectOptions connect_options::DFLT_C_STRUCT =
 		MQTTAsync_connectOptions_initializer;
 
-const MQTTAsync_connectOptions connect_options::DFLT_C_STRUCT5 =
+PAHO_MQTTPP_EXPORT const MQTTAsync_connectOptions connect_options::DFLT_C_STRUCT5 =
 		MQTTAsync_connectOptions_initializer5;
+
+PAHO_MQTTPP_EXPORT const MQTTAsync_connectOptions connect_options::DFLT_C_STRUCT_WS =
+		MQTTAsync_connectOptions_initializer_ws;
+
+PAHO_MQTTPP_EXPORT const MQTTAsync_connectOptions connect_options::DFLT_C_STRUCT5_WS =
+		MQTTAsync_connectOptions_initializer5_ws;
+
+// --------------------------------------------------------------------------
 
 connect_options::connect_options(int ver /*=MQTTVERSION_DEFAULT*/)
 {
@@ -62,9 +70,6 @@ connect_options::connect_options(const connect_options& opt) : opts_(opt.opts_),
 	if (opts_.ssl)
 		set_ssl(opt.ssl_);
 
-	if (opts_.connectProperties)
-		set_properties(opt.props_);
-
 	update_c_struct();
 }
 
@@ -89,10 +94,17 @@ connect_options::connect_options(connect_options&& opt) : opts_(opt.opts_),
 	if (opts_.ssl)
 		opts_.ssl = &ssl_.opts_;
 	
-	if (opts_.connectProperties)
-		opts_.connectProperties = const_cast<MQTTProperties*>(&props_.c_struct());
-
 	update_c_struct();
+}
+
+connect_options connect_options::v3()
+{
+	return connect_options(DFLT_C_STRUCT);
+}
+
+connect_options connect_options::v5()
+{
+	return connect_options(DFLT_C_STRUCT5);
 }
 
 // Unfortunately, with the existing implementation, there's no way to know
@@ -146,6 +158,11 @@ void connect_options::update_c_struct()
 		opts_.serverURIs = serverURIs_->c_arr();
 	}
 
+	// Connect Properties
+
+	if (opts_.MQTTVersion >= MQTTVERSION_5)
+		opts_.connectProperties = const_cast<MQTTProperties*>(&props_.c_struct());
+
 	// HTTP & Proxy
 
 	opts_.httpProxy = c_str(httpProxy_);
@@ -170,8 +187,7 @@ connect_options& connect_options::operator=(const connect_options& opt)
 
 	tok_ = opt.tok_;
 	serverURIs_ = opt.serverURIs_;
-	if (opts_.connectProperties)
-		set_properties(opt.props_);
+	props_ = opt.props_;
 
 	httpHeaders_ = opt.httpHeaders_;
 	httpProxy_ = opt.httpProxy_;
@@ -199,8 +215,7 @@ connect_options& connect_options::operator=(connect_options&& opt)
 
 	tok_ = std::move(opt.tok_);
 	serverURIs_ = std::move(opt.serverURIs_);
-	if (opts_.connectProperties)
-		set_properties(std::move(opt.props_));
+	props_ = std::move(opt.props_);
 
 	httpHeaders_ = std::move(opt.httpHeaders_);
 	httpProxy_ = std::move(opt.httpProxy_);
@@ -355,8 +370,8 @@ void connect_options::set_https_proxy(const string& httpsProxy)
 /////////////////////////////////////////////////////////////////////////////
 // connect_data
 
-const MQTTAsync_connectData connect_data::DFLT_C_STRUCT =
-		MQTTAsync_connectData_initializer;
+PAHO_MQTTPP_EXPORT const MQTTAsync_connectData connect_data::DFLT_C_STRUCT
+    = MQTTAsync_connectData_initializer;
 
 connect_data::connect_data() : data_(DFLT_C_STRUCT)
 {

@@ -15,14 +15,14 @@
 //
 
 /*******************************************************************************
- * Copyright (c) 2020 Frank Pagliughi <fpagliughi@mindspring.com>
+ * Copyright (c) 2020-2023 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
+ * are made available under the terms of the Eclipse Public License v2.0
  * and Eclipse Distribution License v1.0 which accompany this distribution.
  *
  * The Eclipse Public License is available at
- *    http://www.eclipse.org/legal/epl-v10.html
+ *    http://www.eclipse.org/legal/epl-v20.html
  * and the Eclipse Distribution License is available at
  *   http://www.eclipse.org/org/documents/edl-v10.php.
  *
@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
 
 	// Build the connect options.
 
-	auto connBuilder = mqtt::connect_options_builder();
+	auto connBuilder = mqtt::connect_options_builder::ws();
 
 	if (!proxy.empty())
 		connBuilder.http_proxy(proxy);
