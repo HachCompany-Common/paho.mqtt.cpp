@@ -7,10 +7,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## Version 1.5.0  (Unreleased)
+## [Version 1.5.0](https://github.com/eclipse/paho.mqtt.cpp/compare/v1.4.1..v1.5.0) - (2025-01-07)
 
-- Required C++ standard raised to C++17
-- CMake minimum required version raised to v3.12 
+- Code base updated to to C++17
+    - Now a C++17 compiler is required to compile the library
+- CMake minimum required version raised to v3.13
+    - Need a fairly recent CMake for C++17 support (>= v3.12)
+    - [#504](https://github.com/eclipse-paho/paho.mqtt.cpp/issues/504) CMake v3.13 allows INSTALL(TARGETS) to work outside the current directory.
 - Clients always created for v5 persistence format, making it universal for any connection.
     - If the application specifies a version it is kept as a hint for default connections.
     - The version for the connection should be specified in the connect options.
@@ -19,14 +22,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - New client constructor that takes just the options object
     - The client caches a const `create_options` struct with all the creation parameters
     - Client creation internally simplified without breaking the public API
+- Expanded the message constmer to be a full client "event" consumer.
+    - The events are for *connected, connection_lost, disconnected, message arrived,* and application *shutdown.*
+    - The application can get client state change notifications without resorting to callbacks.
 - There's a new `persistence_type` (std::variant) that can hold any of the persistence specifiers (none, file directory, or user interface).
 - Most of the class static constants are now `constexpr`.
 - Removed the fake `ReasonCode::MQTTPP_V3_CODE`. Now all reason codes in a v3 connection are SUCCESS.
 - The `mqtt::exception` checks if the 'rc' return code actually contains a reason code error, amd if so, sets it as the reason code.
 - `property` can now report the `typeid` of its contained value.
 - The `properties` list implements a const iterator
+- Added a `to_string()` and `operator<<()` for reason codes.
+- `thread_queue` is now closable.
+- Added documentation for UNIX domain sockets coming in with Paho C v1.3.14
+- Removed the manual implementation of `make_unique<>()`
+- Added `create_options` assignment operators.
+- Fixed some corner cases for topic_filter::matches()
+- Cleaned up and fixed a number of example apps.
+    - Most apps now except a server URI from the command line
+    - 'data_publish' example uses C++17 std::filesystem for creating a file-based encrypted persistence for messages.
+- Updated local CI (buildtst.sh) for current compilers and unit tests.
+- Reorganized the source repository
 - Completely reformat the sources and added a .clang-format file (a project master and a slightly-different one for headers).
 - Added GitHub CI Action, removing legacy Travis and Appveyor files
+- [#410](https://github.com/eclipse-paho/paho.mqtt.cpp/issues/410) Added 'shutdown_event' to the event consumer and reworked consumer to prevent propagating exceptions on shutdown.
+- [#451](https://github.com/eclipse-paho/paho.mqtt.cpp/issues/451) Added low keep alive to async_publish_time to test connected/connection_lost callbacks
+- [#503](https://github.com/eclipse-paho/paho.mqtt.cpp/issues/503) Fixed issue that generated docs were empty.
+- [#518](https://github.com/eclipse-paho/paho.mqtt.cpp/pull/518) Add function for checking async consumer event queue size
+- [#519](https://github.com/eclipse-paho/paho.mqtt.cpp/pull/519) Fix potential deadlock in set_callback
+- [#524](https://github.com/eclipse-paho/paho.mqtt.cpp/issues/524) Fixed copy and move operations for 'subscribe_options'. Added unit tests.
+
+
+## [Version 1.4.1](https://github.com/eclipse/paho.mqtt.cpp/compare/v1.4.0..v1.4.1) - (2024-07-09)
+
+- [#458](https://github.com/eclipse/paho.mqtt.cpp/issues/458) Set 'disconnected' handler for the consumer queue.
+
 
 ## [Version 1.4.0](https://github.com/eclipse/paho.mqtt.cpp/compare/v1.3.2..v1.4.0) - (2024-06-16)
 
@@ -40,7 +69,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added some missing Eclipse/Paho legal documents to the repo.
 - Ran a spell-checker over the code and doc files.
 
-- [#498](https://github.com/eclipse/paho.mqtt.cpp/issues/416) Overloaded property constructor to also take a uint32_t 
+- [#498](https://github.com/eclipse/paho.mqtt.cpp/issues/498) Overloaded property constructor to also take a uint32_t
 - [#491](https://github.com/eclipse/paho.mqtt.cpp/pull/491) add topic_matcher.h to install
 - [#485](https://github.com/eclipse/paho.mqtt.cpp/pull/485) export dependencies
 - [#484](https://github.com/eclipse/paho.mqtt.cpp/pull/484) add token::get_message

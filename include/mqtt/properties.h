@@ -34,6 +34,7 @@ extern "C" {
 #include <string_view>
 #include <tuple>
 #include <typeinfo>
+#include <stdexcept>
 
 #include "mqtt/buffer_ref.h"
 #include "mqtt/exception.h"
@@ -405,6 +406,24 @@ public:
      */
     bool empty() const { return props_.count == 0; }
     /**
+     * Gets the property at the specified index in the collection.
+     * @param i The index
+     * @return The property at the specified index.
+     */
+    const property operator[](size_t i) const {
+        return property{props_.array[i]};
+    }
+    /**
+     * Gets the property at the specified index in the collection.
+     * @param i The index
+     * @return The property at the specified index.
+     */
+    const property at(size_t i) const {
+        if (i < size_t(props_.count))
+            return property{props_.array[i]};
+        throw std::out_of_range{"propery index"};
+    }
+    /**
      * Gets the numbers of property items in the list.
      * @return The number of property items in the list.
      */
@@ -471,7 +490,7 @@ public:
      *  		  more than one.
      * @return The requested property
      */
-    property get(property::code propid, size_t idx = 0);
+    property get(property::code propid, size_t idx = 0) const;
 };
 
 // --------------------------------------------------------------------------

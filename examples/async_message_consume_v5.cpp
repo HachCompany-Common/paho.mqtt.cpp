@@ -1,4 +1,4 @@
-// async_consume.cpp
+// async_consume_v5.cpp
 //
 // This is a Paho MQTT C++ client, sample application.
 //
@@ -7,11 +7,9 @@
 // and status updates.
 //
 // The sample demonstrates:
-//  - Connecting to an MQTT v3 server/broker.
+//  - Connecting to an MQTT v5 server/broker.
 //  - Subscribing to a topic
-//  - Persistent subscriber session
-//  - Receiving messages through the synchronous queuing API
-//  - Auto reconnecting
+//  - Receiving messages through the consuming (queuing) API
 //
 
 /*******************************************************************************
@@ -43,7 +41,7 @@
 using namespace std;
 
 const string DFLT_SERVER_URI{"mqtt://localhost:1883"};
-const string CLIENT_ID{"paho_cpp_async_consume"};
+const string CLIENT_ID{"PahoCppAsyncConsumeV5"};
 
 const string TOPIC{"hello"};
 const int QOS = 1;
@@ -52,18 +50,26 @@ const int QOS = 1;
 
 int main(int argc, char* argv[])
 {
-    auto serverUri = (argc > 1) ? string{argv[1]} : DFLT_SERVER_URI;
+    auto serverURI = (argc > 1) ? string{argv[1]} : DFLT_SERVER_URI;
 
-    mqtt::async_client cli(serverUri, CLIENT_ID);
+    mqtt::async_client cli(serverURI, CLIENT_ID);
 
-    auto connOpts = mqtt::connect_options_builder::v3()
-                        .keep_alive_interval(30s)
-                        .clean_session(false)
-                        .automatic_reconnect()
+    auto connOpts = mqtt::connect_options_builder::v5()
+                        .clean_start(false)
+                        .properties({{mqtt::property::SESSION_EXPIRY_INTERVAL, 604800}})
                         .finalize();
 
     try {
-        // Start consumer before connecting to make sure to not miss any messages
+        cli.set_connection_lost_handler([](const std::string&) {
+            cout << "*** Connection Lost ***" << endl;
+        });
+
+        cli.set_disconnected_handler([](const mqtt::properties&, mqtt::ReasonCode reason) {
+            cout << "*** Disconnected. Reason [0x" << hex << int{reason} << "]: " << reason
+                 << " ***" << endl;
+        });
+
+        // Start consumer before connecting to make sure to not miss messages
 
         cli.start_consuming();
 
@@ -76,34 +82,46 @@ int main(int argc, char* argv[])
         // connection to complete.
         auto rsp = tok->get_connect_response();
 
+        // Make sure we were granted a v5 connection.
+        if (rsp.get_mqtt_version() < MQTTVERSION_5) {
+            cout << "\n  Did not get an MQTT v5 connection." << flush;
+            exit(1);
+        }
+
         // If there is no session present, then we need to subscribe, but if
         // there is a session, then the server remembers us and our
         // subscriptions.
         if (!rsp.is_session_present()) {
-            cout << "  No session present on server. Subscribing..." << flush;
+            cout << "\n  Session not present on broker. Subscribing..." << flush;
             cli.subscribe(TOPIC, QOS)->wait();
         }
 
-        cout << "OK" << endl;
+        cout << "\n  OK" << endl;
 
         // Consume messages
+        // This just exits if the client is disconnected.
+        // (See some other examples for auto or manual reconnect)
 
         cout << "\nWaiting for messages on topic: '" << TOPIC << "'" << endl;
 
-        // The client handles automatic reconnects, but we monitor
-        // the events here to report them to the user.
         while (true) {
-            auto evt = cli.consume_event();
+            auto msg = cli.consume_message();
+            if (!msg)
+                break;
+            cout << msg->get_topic() << ": " << msg->to_string() << endl;
+        }
 
-            if (const auto* p = evt.get_message_if()) {
-                auto& msg = *p;
-                if (msg)
-                    cout << msg->get_topic() << ": " << msg->to_string() << endl;
-            }
-            else if (evt.is_connected())
-                cout << "\n*** Connected ***" << endl;
-            else if (evt.is_connection_lost())
-                cout << "*** Connection Lost ***" << endl;
+        // If we're here, the client was almost certainly disconnected.
+        // But we check, just to make sure.
+
+        if (cli.is_connected()) {
+            cout << "\nShutting down and disconnecting from the MQTT server..." << flush;
+            cli.stop_consuming();
+            cli.disconnect()->wait();
+            cout << "OK" << endl;
+        }
+        else {
+            cout << "\nClient was disconnected" << endl;
         }
     }
     catch (const mqtt::exception& exc) {

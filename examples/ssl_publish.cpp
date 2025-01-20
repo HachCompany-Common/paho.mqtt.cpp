@@ -50,7 +50,7 @@
 
 #include "mqtt/async_client.h"
 
-const std::string DFLT_SERVER_ADDRESS{"mqtts://localhost:18884"};
+const std::string DFLT_SERVER_URI{"mqtts://localhost:18884"};
 const std::string DFLT_CLIENT_ID{"ssl_publish_cpp"};
 
 const std::string KEY_STORE{"client.pem"};
@@ -90,8 +90,8 @@ using namespace std;
 
 int main(int argc, char* argv[])
 {
-    string address = (argc > 1) ? string(argv[1]) : DFLT_SERVER_ADDRESS,
-           clientID = (argc > 2) ? string(argv[2]) : DFLT_CLIENT_ID;
+    string serverURI = (argc > 1) ? string{argv[1]} : DFLT_SERVER_URI,
+           clientID = (argc > 2) ? string{argv[2]} : DFLT_CLIENT_ID;
 
     // Note that we don't actually need to open the trust or key stores.
     // We just need a quick, portable way to check that they exist.
@@ -112,8 +112,8 @@ int main(int argc, char* argv[])
         }
     }
 
-    cout << "Initializing for server '" << address << "'..." << endl;
-    mqtt::async_client client(address, clientID);
+    cout << "Initializing for server '" << serverURI << "'..." << endl;
+    mqtt::async_client client(serverURI, clientID);
 
     callback cb;
     client.set_callback(cb);

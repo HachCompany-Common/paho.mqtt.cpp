@@ -35,6 +35,16 @@
 
 namespace mqtt {
 
+/**
+ * Exception that is thrown when operations are performed on a closed
+ * queue.
+ */
+class queue_closed : public std::runtime_error
+{
+public:
+    queue_closed() : std::runtime_error("queue is closed") {}
+};
+
 /////////////////////////////////////////////////////////////////////////////
 
 /**
@@ -52,6 +62,12 @@ namespace mqtt {
  * smaller than the current size of the queue. In that case all put's to the
  * queue will block until the number of items are removed from the queue to
  * bring the size below the new capacity.
+ * @par
+ * The queue can be closed. After that, no new items can be placed into it;
+ * a `put()` calls will fail. Receivers can still continue to get any items
+ * out of the queue that were added before it was closed. Once there are no
+ * more items left in the queue after it is closed, it is considered "done".
+ * Nothing useful can be done with the queue.
  * @par
  * Note that the queue uses move semantics to place items into the queue and
  * remove items from the queue. This means that the type, T, of the data
@@ -87,7 +103,10 @@ private:
     /** Condition gets signaled then item removed from full queue */
     std::condition_variable notFullCond_;
     /** The capacity of the queue */
-    size_type cap_;
+    size_type cap_{MAX_CAPACITY};
+    /** Whether the queue is closed */
+    bool closed_{false};
+
     /** The actual STL container to hold data */
     std::queue<T, Container> que_;
 
@@ -96,13 +115,20 @@ private:
     /** General purpose guard */
     using unique_guard = std::unique_lock<std::mutex>;
 
+    /** Checks if the queue is done (unsafe) */
+    bool is_done() const {
+        return closed_ && que_.empty();
+    }
+
 public:
     /**
      * Constructs a queue with the maximum capacity.
+     * This is effectively an unbounded queue.
      */
-    thread_queue() : cap_(MAX_CAPACITY) {}
+    thread_queue() {}
     /**
      * Constructs a queue with the specified capacity.
+     * This is a bounded queue.
      * @param cap The maximum number of items that can be placed in the
      *  		  queue. The minimum capacity is 1.
      */
@@ -113,7 +139,7 @@ public:
      *  	   there are any items in the queue.
      */
     bool empty() const {
-        guard g(lock_);
+        guard g{lock_};
         return que_.empty();
     }
     /**
@@ -121,7 +147,7 @@ public:
      * @return The maximum number of elements before the queue is full.
      */
     size_type capacity() const {
-        guard g(lock_);
+        guard g{lock_};
         return cap_;
     }
     /**
@@ -131,7 +157,7 @@ public:
      * a sufficient number
      */
     void capacity(size_type cap) {
-        guard g(lock_);
+        guard g{lock_};
         cap_ = cap;
     }
     /**
@@ -139,8 +165,51 @@ public:
      * @return The number of items in the queue.
      */
     size_type size() const {
-        guard g(lock_);
+        guard g{lock_};
         return que_.size();
+    }
+    /**
+     * Close the queue.
+     * Once closed, the queue will not accept any new items, but receievers
+     * will still be able to get any remaining items out of the queue until
+     * it is empty.
+     */
+    void close() {
+        guard g{lock_};
+        closed_ = true;
+        notFullCond_.notify_all();
+        notEmptyCond_.notify_all();
+    }
+    /**
+     * Determines if the queue is closed.
+     * Once closed, the queue will not accept any new items, but receievers
+     * will still be able to get any remaining items out of the queue until
+     * it is empty.
+     * @return @em true if the queue is closed, @false otherwise.
+     */
+    bool closed() const {
+        guard g{lock_};
+        return closed_;
+    }
+    /**
+     * Determines if all possible operations are done on the queue.
+     * If the queue is closed and empty, then no further useful operations
+     * can be done on it.
+     * @return @true if the queue is closed and empty, @em false otherwise.
+     */
+    bool done() const {
+        guard g{lock_};
+        return is_done();
+    }
+    /**
+     * Clear the contents of the queue.
+     * This discards all items in the queue.
+     */
+    void clear() {
+        guard g{lock_};
+        while (!que_.empty())
+            que_.pop();
+        notFullCond_.notify_all();
     }
     /**
      * Put an item into the queue.
@@ -149,11 +218,11 @@ public:
      * @param val The value to add to the queue.
      */
     void put(value_type val) {
-        unique_guard g(lock_);
-        notFullCond_.wait(g, [this] { return que_.size() < cap_; });
+        unique_guard g{lock_};
+        notFullCond_.wait(g, [this] { return que_.size() < cap_ || closed_; });
+        if (closed_) throw queue_closed{};
 
         que_.emplace(std::move(val));
-        g.unlock();
         notEmptyCond_.notify_one();
     }
     /**
@@ -163,12 +232,11 @@ public:
      *  	   item was not added because the queue is currently full.
      */
     bool try_put(value_type val) {
-        unique_guard g(lock_);
-        if (que_.size() >= cap_)
+        guard g{lock_};
+        if (que_.size() >= cap_ || closed_)
             return false;
 
         que_.emplace(std::move(val));
-        g.unlock();
         notEmptyCond_.notify_one();
         return true;
     }
@@ -183,12 +251,15 @@ public:
      */
     template <typename Rep, class Period>
     bool try_put_for(value_type val, const std::chrono::duration<Rep, Period>& relTime) {
-        unique_guard g(lock_);
-        if (!notFullCond_.wait_for(g, relTime, [this] { return que_.size() < cap_; }))
+        unique_guard g{lock_};
+        bool to = !notFullCond_.wait_for(
+			g, relTime,
+			[this] { return que_.size() < cap_ || closed_; }
+	    );
+        if (to || closed_)
             return false;
 
         que_.emplace(std::move(val));
-        g.unlock();
         notEmptyCond_.notify_one();
         return true;
     }
@@ -206,12 +277,16 @@ public:
     bool try_put_until(
         value_type val, const std::chrono::time_point<Clock, Duration>& absTime
     ) {
-        unique_guard g(lock_);
-        if (!notFullCond_.wait_until(g, absTime, [this] { return que_.size() < cap_; }))
+        unique_guard g{lock_};
+        bool to = !notFullCond_.wait_until(
+			g, absTime,
+			[this] { return que_.size() < cap_ || closed_; }
+	    );
+
+        if (to || closed_)
             return false;
 
         que_.emplace(std::move(val));
-        g.unlock();
         notEmptyCond_.notify_one();
         return true;
     }
@@ -221,17 +296,19 @@ public:
      * added to the queue by another thread,
      * @param val Pointer to a variable to receive the value.
      */
-    void get(value_type* val) {
+    bool get(value_type* val) {
         if (!val)
-            return;
+            return false;
 
-        unique_guard g(lock_);
-        notEmptyCond_.wait(g, [this] { return !que_.empty(); });
+        unique_guard g{lock_};
+        notEmptyCond_.wait(g, [this] { return !que_.empty() || closed_; });
+        if (que_.empty())  // We must be done
+            return false;
 
         *val = std::move(que_.front());
         que_.pop();
-        g.unlock();
         notFullCond_.notify_one();
+        return true;
     }
     /**
      * Retrieve a value from the queue.
@@ -240,12 +317,13 @@ public:
      * @return The value removed from the queue
      */
     value_type get() {
-        unique_guard g(lock_);
-        notEmptyCond_.wait(g, [this] { return !que_.empty(); });
+        unique_guard g{lock_};
+        notEmptyCond_.wait(g, [this] { return !que_.empty() || closed_; });
+        if (que_.empty())  // We must be done
+            throw queue_closed{};
 
         value_type val = std::move(que_.front());
         que_.pop();
-        g.unlock();
         notFullCond_.notify_one();
         return val;
     }
@@ -261,13 +339,12 @@ public:
         if (!val)
             return false;
 
-        unique_guard g(lock_);
+        guard g{lock_};
         if (que_.empty())
             return false;
 
         *val = std::move(que_.front());
         que_.pop();
-        g.unlock();
         notFullCond_.notify_one();
         return true;
     }
@@ -286,13 +363,17 @@ public:
         if (!val)
             return false;
 
-        unique_guard g(lock_);
-        if (!notEmptyCond_.wait_for(g, relTime, [this] { return !que_.empty(); }))
+        unique_guard g{lock_};
+        notEmptyCond_.wait_for(
+			g, relTime,
+			[this] { return !que_.empty() || closed_; }
+	    );
+
+        if (que_.empty())
             return false;
 
         *val = std::move(que_.front());
         que_.pop();
-        g.unlock();
         notFullCond_.notify_one();
         return true;
     }
@@ -313,13 +394,15 @@ public:
         if (!val)
             return false;
 
-        unique_guard g(lock_);
-        if (!notEmptyCond_.wait_until(g, absTime, [this] { return !que_.empty(); }))
+        unique_guard g{lock_};
+        notEmptyCond_.wait_until(
+			g, absTime, [this] { return !que_.empty() || closed_; }
+	    );
+        if (que_.empty())
             return false;
 
         *val = std::move(que_.front());
         que_.pop();
-        g.unlock();
         notFullCond_.notify_one();
         return true;
     }

@@ -46,7 +46,7 @@
 using namespace std;
 using namespace std::chrono;
 
-const string SERVER_ADDRESS{"mqtt://localhost:1883"};
+const string DFLT_SERVER_URI{"mqtt://localhost:1883"};
 const string CLIENT_ID{"paho_cpp_sync_consume5"};
 
 constexpr int QOS_0 = 0;
@@ -82,7 +82,9 @@ bool command_handler(const mqtt::message& msg)
 
 int main(int argc, char* argv[])
 {
-    mqtt::client cli(SERVER_ADDRESS, CLIENT_ID, mqtt::create_options(MQTTVERSION_5));
+    auto serverURI = (argc > 1) ? std::string{argv[1]} : DFLT_SERVER_URI;
+
+    mqtt::client cli(serverURI, CLIENT_ID, mqtt::create_options(MQTTVERSION_5));
 
     auto connOpts = mqtt::connect_options_builder::v5()
                         .automatic_reconnect(seconds(2), seconds(30))

@@ -40,17 +40,20 @@
 
 using namespace std;
 
-const string SERVER_ADDRESS{"mqtt://localhost:1883"};
+const string DFLT_SERVER_URI{"mqtt://localhost:1883"};
 const string CLIENT_ID{"PahoCppAsyncConsumeV5"};
-const string TOPIC{"hello"};
 
+// const string TOPIC{"hello"};
+const string TOPIC{"#"};
 const int QOS = 1;
 
 /////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char* argv[])
 {
-    mqtt::async_client cli(SERVER_ADDRESS, CLIENT_ID);
+    auto serverURI = (argc > 1) ? string{argv[1]} : DFLT_SERVER_URI;
+
+    auto cli = std::make_shared<mqtt::async_client>(serverURI, CLIENT_ID);
 
     auto connOpts = mqtt::connect_options_builder::v5()
                         .clean_start(false)
@@ -58,22 +61,14 @@ int main(int argc, char* argv[])
                         .finalize();
 
     try {
-        cli.set_connection_lost_handler([](const std::string&) {
-            cout << "*** Connection Lost ***" << endl;
-        });
-
-        cli.set_disconnected_handler([](const mqtt::properties&, mqtt::ReasonCode reason) {
-            cout << "*** Disconnected. Reason: " << reason << " ***" << endl;
-        });
-
         // Start consumer before connecting to make sure to not miss messages
 
-        cli.start_consuming();
+        cli->start_consuming();
 
         // Connect to the server
 
         cout << "Connecting to the MQTT server..." << flush;
-        auto tok = cli.connect(connOpts);
+        auto tok = cli->connect(connOpts);
 
         // Getting the connect response will block waiting for the
         // connection to complete.
@@ -81,7 +76,7 @@ int main(int argc, char* argv[])
 
         // Make sure we were granted a v5 connection.
         if (rsp.get_mqtt_version() < MQTTVERSION_5) {
-            cout << "Did not get an MQTT v5 connection." << endl;
+            cout << "\n  Did not get an MQTT v5 connection." << flush;
             exit(1);
         }
 
@@ -89,36 +84,72 @@ int main(int argc, char* argv[])
         // there is a session, then the server remembers us and our
         // subscriptions.
         if (!rsp.is_session_present()) {
-            cout << "Session not present on broker. Subscribing." << endl;
-            cli.subscribe(TOPIC, QOS)->wait();
+            cout << "\n  Session not present on broker. Subscribing..." << flush;
+            cli->subscribe(TOPIC, QOS)->wait();
         }
 
-        cout << "OK" << endl;
+        cout << "\n  OK" << endl;
+
+        // We'll signal the consumer to exit from another thread.
+        // (just to show that we can)
+        thread([cli] {
+            this_thread::sleep_for(60s);
+            cout << "\nClosing the consumer." << endl;
+            cli->stop_consuming();
+        }).detach();
 
         // Consume messages
-        // This just exits if the client is disconnected.
-        // (See some other examples for auto or manual reconnect)
+        //
+        // This just exits if the consumer is closed or the client is
+        // disconnected. (See some other examples for auto or manual
+        // reconnect)
 
-        cout << "Waiting for messages on topic: '" << TOPIC << "'" << endl;
+        cout << "\nWaiting for messages on topic: '" << TOPIC << "'" << endl;
 
-        while (true) {
-            auto msg = cli.consume_message();
-            if (!msg)
-                break;
-            cout << msg->get_topic() << ": " << msg->to_string() << endl;
+        try {
+            while (true) {
+                auto evt = cli->consume_event();
+
+                if (const auto* p = evt.get_message_if()) {
+                    auto& msg = *p;
+                    if (!msg)
+                        continue;
+
+                    cout << msg->get_topic() << ": " << msg->to_string();
+
+                    const auto& props = msg->get_properties();
+                    size_t n = props.size();
+                    if (n != 0) {
+                        cout << "\n  [";
+                        for (size_t i = 0; i < n - 1; ++i) cout << props[i] << ", ";
+                        cout << props[n - 1] << "]";
+                    }
+                    cout << endl;
+                }
+                else if (evt.is_connected()) {
+                    cout << "\n*** Connected ***" << endl;
+                }
+                else if (evt.is_connection_lost()) {
+                    cout << "*** Connection Lost ***" << endl;
+                    break;
+                }
+                else if (const auto* p = evt.get_disconnected_if()) {
+                    cout << "*** Disconnected. Reason [0x" << hex << int{p->reasonCode}
+                         << "]: " << p->reasonCode << " ***" << endl;
+                    break;
+                }
+            }
+        }
+        catch (mqtt::queue_closed&) {
         }
 
         // If we're here, the client was almost certainly disconnected.
         // But we check, just to make sure.
 
-        if (cli.is_connected()) {
+        if (cli->is_connected()) {
             cout << "\nShutting down and disconnecting from the MQTT server..." << flush;
-            cli.stop_consuming();
-            cli.disconnect()->wait();
+            cli->disconnect()->wait();
             cout << "OK" << endl;
-        }
-        else {
-            cout << "\nClient was disconnected" << endl;
         }
     }
     catch (const mqtt::exception& exc) {

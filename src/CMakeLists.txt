@@ -39,6 +39,7 @@ set(COMMON_SRC
     iclient_persistence.cpp
     message.cpp
     properties.cpp
+    reason_code.cpp
     response_options.cpp
     server_response.cpp
     ssl_options.cpp

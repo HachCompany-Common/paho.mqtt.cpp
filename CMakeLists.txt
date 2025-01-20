@@ -5,7 +5,7 @@
 #*******************************************************************************
 # This is part of the Paho MQTT C++ client library.
 #
-# Copyright (c) 2017-2024, Frank Pagliughi
+# Copyright (c) 2017-2025, Frank Pagliughi
 # Copyright (c) 2016-2017, Guilherme Maciel Ferreira
 #
 # All rights reserved. This program and the accompanying materials
@@ -22,9 +22,9 @@
 #   Frank Pagliughi
 #*******************************************************************************/
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.13)
 
-project(PahoMqttCpp VERSION "1.5.0.1")
+project(PahoMqttCpp VERSION "1.5.0")
 
 ## --- Build options ---
 
@@ -64,9 +64,9 @@ if(PAHO_WITH_MQTT_C)
     ## Build the Paho C library from the submodule
     set(PAHO_ENABLE_TESTING FALSE CACHE BOOL "No Paho C tests")
     set(PAHO_HIGH_PERFORMANCE TRUE CACHE BOOL "Paho C high performance")
-
-    # TODO: Remove this when the next Paho C update is released.
-    set(CMAKE_POLICY_DEFAULT_CMP0048 NEW)
+    if(NOT WIN32)
+        set(PAHO_WITH_UNIX_SOCKETS TRUE CACHE BOOL "Support for Unix-domain sockets")
+    endif()
 
     add_subdirectory(${PROJECT_SOURCE_DIR}/externals/paho-mqtt-c)
 

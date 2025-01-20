@@ -34,7 +34,7 @@ namespace mqtt {
 
 /////////////////////////////////////////////////////////////////////////////
 
-/** An empty type that can be used as a `persistent_type` variant opiton. */
+/** An empty type that can be used as a `persistent_type` variant option. */
 struct no_persistence
 {
 };

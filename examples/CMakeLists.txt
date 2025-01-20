@@ -33,6 +33,8 @@ set(EXECUTABLES
     async_subscribe
     async_consume
     async_consume_v5
+    async_message_consume
+    async_message_consume_v5
     data_publish
     mqttpp_chat
     multithr_pub_sub

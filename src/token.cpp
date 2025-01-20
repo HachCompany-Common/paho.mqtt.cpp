@@ -1,7 +1,7 @@
 // token.cpp
 
 /*******************************************************************************
- * Copyright (c) 2013-2019 Frank Pagliughi <fpagliughi@mindspring.com>
+ * Copyright (c) 2013-2024 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v2.0
@@ -257,20 +257,19 @@ void token::reset()
     errMsg_.clear();
 }
 
-void set_action_callback(iaction_listener& listener)
+void token::set_action_callback(iaction_listener& listener)
 {
-	guard g(lock_);
-	listener_ = &listener;
+    unique_lock g{lock_};
+    listener_ = &listener;
 
-	if (complete_)
-	{
-		g.unlock();
+    if (complete_) {
+        g.unlock();
 
-		if (rc_ == MQTTASYNC_SUCCESS)
-			listener.on_success(*this);
-		else
-			listener.on_failure(*this);
-	}
+        if (rc_ == MQTTASYNC_SUCCESS)
+            listener.on_success(*this);
+        else
+            listener.on_failure(*this);
+    }
 }
 
 void token::wait()

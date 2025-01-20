@@ -40,7 +40,7 @@
 #include "mqtt/async_client.h"
 
 // Assume a local server with websocket support on port 8080
-const std::string DFLT_SERVER_ADDRESS{"ws://localhost:8080"};
+const std::string DFLT_SERVER_URI{"ws://localhost:8080"};
 
 // A local proxy, like squid on port 3128
 // Here assuming basic authentication with user "user" and password "pass".
@@ -58,14 +58,14 @@ using namespace std;
 
 int main(int argc, char* argv[])
 {
-    string address = (argc > 1) ? string(argv[1]) : DFLT_SERVER_ADDRESS,
-           proxy = (argc > 2) ? string(argv[2]) : DFLT_PROXY_ADDRESS;
+    string serverURI = (argc > 1) ? string{argv[1]} : DFLT_SERVER_URI,
+           proxy = (argc > 2) ? string{argv[2]} : DFLT_PROXY_ADDRESS;
 
-    cout << "Initializing for server '" << address << "'..." << endl;
+    cout << "Initializing for server '" << serverURI << "'..." << endl;
     if (!proxy.empty())
         cout << "    with proxy '" << proxy << "'" << endl;
 
-    mqtt::async_client client(address, "");
+    mqtt::async_client client(serverURI, "");
 
     // Build the connect options.
 

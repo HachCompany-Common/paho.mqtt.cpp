@@ -21,18 +21,20 @@
 // processing, perhaps based on the topics. It could be common, however, to
 // want to have multiple threads for publishing.
 //
-// The sample demonstrates:
-//  - Creating a client and accessing it from a shared_ptr<>
+// This example demonstrates:
+//  - Creating a client and sharing it across threads using a shared_ptr<>
 //  - Using one thread to receive incoming messages from the broker and
 //    another thread to publish messages to it.
 //  - Connecting to an MQTT server/broker.
-//  - Subscribing to a topic
-//  - Using the asynchronous consumer
-//  - Publishing messages.
+//  - Automatic reconnect
+//  - Publishing messages
+//  - Subscribing to multiple topics
+//  - Using the asynchronous message consumer
+//  - Signaling consumer from another thread
 //
 
 /*******************************************************************************
- * Copyright (c) 2020-2023 Frank Pagliughi <fpagliughi@mindspring.com>
+ * Copyright (c) 2020-2025 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v2.0
@@ -61,8 +63,8 @@
 using namespace std;
 using namespace std::chrono;
 
-const std::string DFLT_SERVER_ADDRESS("mqtt://localhost:1883");
-const std::string CLIENT_ID("multithr_pub_sub_cpp");
+const std::string DFLT_SERVER_ADDRESS{"mqtt://localhost:1883"};
+const std::string CLIENT_ID{"multithr_pub_sub_cpp"};
 
 /////////////////////////////////////////////////////////////////////////////
 
@@ -172,6 +174,10 @@ int main(int argc, char* argv[])
         auto rsp = cli->connect(connOpts)->get_connect_response();
         cout << "OK\n" << endl;
 
+        cout << "Now start an application such as 'async_publish_time'\n"
+             << "that publishes to a 'data/' topic...\n"
+             << endl;
+
         // Subscribe if this is a new session with the server
         if (!rsp.is_session_present())
             cli->subscribe(TOPICS, QOS);
@@ -180,13 +186,32 @@ int main(int argc, char* argv[])
 
         std::thread publisher(publisher_func, cli, counter);
 
+        // Start another thread to shut us down after a minute
+
+        std::thread{[cli] {
+            this_thread::sleep_for(30s);
+            cout << "Signaling the consumer to stop." << endl;
+            cli->stop_consuming();
+        }}.detach();
+
         // Consume messages in this thread
+
+        // Remember that with the message consumer, we can't detect a
+        // reconnect We would need to register a connect callback or use the
+        // event consumer.
 
         while (true) {
             auto msg = cli->consume_message();
 
-            if (!msg)
+            if (!msg) {
+                // Exit if the consumer was shut down
+                if (cli->consumer_closed())
+                    break;
+
+                // Otherwise let auto-reconnect deal with it.
+                cout << "Disconnect detected. Attempting an auto-reconnect." << endl;
                 continue;
+            }
 
             if (msg->get_topic() == "command" && msg->to_string() == "exit") {
                 cout << "Exit command received" << endl;

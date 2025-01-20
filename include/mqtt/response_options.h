@@ -1,8 +1,24 @@
 /////////////////////////////////////////////////////////////////////////////
 /// @file response_options.h
 /// Implementation of the class 'response_options'
-/// @date 26-Aug-2016
+/// @date 26-Aug-2019
 /////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+ * Copyright (c) 2019-2025 Frank Pagliughi <fpagliughi@mindspring.com>
+ *
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v2.0
+ * and Eclipse Distribution License v1.0 which accompany this distribution.
+ *
+ * The Eclipse Public License is available at
+ *    http://www.eclipse.org/legal/epl-v20.html
+ * and the Eclipse Distribution License is available at
+ *   http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * Contributors:
+ *    Frank Pagliughi - initial implementation and documentation
+ *******************************************************************************/
 
 #ifndef __mqtt_response_options_h
 #define __mqtt_response_options_h
@@ -71,15 +87,25 @@ public:
      */
     response_options(const response_options& other);
     /**
+     * Move constructor.
+     * @param other The other options to move into this one.
+     */
+    response_options(response_options&& other);
+    /**
      * Copy operator.
      * @param rhs The other options to copy to this one.
      */
     response_options& operator=(const response_options& rhs);
+    /**
+     * Move operator.
+     * @param rhs The other options to move into this one.
+     */
+    response_options& operator=(response_options&& rhs);
 /**
  * Expose the underlying C struct for the unit tests.
  */
 #if defined(UNIT_TESTS)
-    const MQTTAsync_responseOptions& c_struct() const { return opts_; }
+    const auto& c_struct() const { return opts_; }
 #endif
     /**
      * Sets the MQTT protocol version used for the response.
@@ -93,21 +119,37 @@ public:
      */
     void set_token(const token_ptr& tok);
     /**
-     * Sets the properties for the connect.
-     * @param props The properties to place into the message.
+     * Gets the properties for the response options.
+     */
+    const properties& get_properties() const { return props_; }
+    /**
+     * Sets the properties for the response options.
+     * @param props The properties for the response options.
      */
     void set_properties(const properties& props) {
         props_ = props;
         opts_.properties = props_.c_struct();
     }
     /**
-     * Moves the properties for the connect.
-     * @param props The properties to move into the connect object.
+     * Moves the properties for the response options.
+     * @param props The properties to move into the response options.
      */
     void set_properties(properties&& props) {
         props_ = std::move(props);
         opts_.properties = props_.c_struct();
     }
+    /**
+     * Gets the options for a single topic subscription.
+     * @return The subscribe options.
+     */
+    subscribe_options get_subscribe_options() const {
+        return subscribe_options{opts_.subscribeOptions};
+    }
+    /**
+     * Sets the options for a multi-topic subscription.
+     * @return The vector of the subscribe options.
+     */
+    std::vector<subscribe_options> get_subscribe_many_options() const;
     /**
      * Sets the options for a single topic subscription.
      * @param opts The subscribe options.
@@ -117,7 +159,15 @@ public:
      * Sets the options for a multi-topic subscription.
      * @param opts A vector of the subscribe options.
      */
-    void set_subscribe_options(const std::vector<subscribe_options>& opts);
+    void set_subscribe_many_options(const std::vector<subscribe_options>& opts);
+    /**
+     * Sets the options for a multi-topic subscription.
+     * @param opts A vector of the subscribe options.
+     * @sa set_subscribe_options
+     */
+    void set_subscribe_options(const std::vector<subscribe_options>& opts) {
+        set_subscribe_many_options(opts);
+    }
 };
 
 /////////////////////////////////////////////////////////////////////////////
@@ -183,13 +233,21 @@ public:
      * Sets the options for a multi-topic subscription.
      * @param opts A vector of the subscribe options.
      */
+    auto subscribe_many_opts(const std::vector<subscribe_options>& opts) -> self& {
+        opts_.set_subscribe_options(opts);
+        return *this;
+    }
+    /**
+     * Sets the options for a multi-topic subscription.
+     * @param opts A vector of the subscribe options.
+     */
     auto subscribe_opts(const std::vector<subscribe_options>& opts) -> self& {
         opts_.set_subscribe_options(opts);
         return *this;
     }
     /**
-     * Finish building the options and return them.
-     * @return The option struct as built.
+     * Finish building the response options and return them.
+     * @return The response option struct as built.
      */
     response_options finalize() { return opts_; }
 };

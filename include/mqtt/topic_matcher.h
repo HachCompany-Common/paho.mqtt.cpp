@@ -334,6 +334,7 @@ public:
             }
 
             // Topics starting with '$' don't match wildcards in the first field
+			// MQTT v5 Spec, Section 4.7.2:
             // https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901246
 
             if (!snode.first_ || field.empty() || field[0] != '$') {

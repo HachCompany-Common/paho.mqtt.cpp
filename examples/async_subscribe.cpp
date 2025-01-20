@@ -40,7 +40,7 @@
 
 #include "mqtt/async_client.h"
 
-const std::string SERVER_ADDRESS("mqtt://localhost:1883");
+const std::string DFLT_SERVER_URI("mqtt://localhost:1883");
 const std::string CLIENT_ID("paho_cpp_async_subscribe");
 const std::string TOPIC("hello");
 
@@ -181,7 +181,9 @@ int main(int argc, char* argv[])
     // disconnected. In that case, it needs a unique ClientID and a
     // non-clean session.
 
-    mqtt::async_client cli(SERVER_ADDRESS, CLIENT_ID);
+    auto serverURI = (argc > 1) ? std::string{argv[1]} : DFLT_SERVER_URI;
+
+    mqtt::async_client cli(serverURI, CLIENT_ID);
 
     mqtt::connect_options connOpts;
     connOpts.set_clean_session(false);
@@ -194,12 +196,12 @@ int main(int argc, char* argv[])
     // When completed, the callback will subscribe to topic.
 
     try {
-        std::cout << "Connecting to the MQTT server..." << std::flush;
+        std::cout << "Connecting to the MQTT server '" << serverURI << "'..." << std::flush;
         cli.connect(connOpts, nullptr, cb);
     }
     catch (const mqtt::exception& exc) {
-        std::cerr << "\nERROR: Unable to connect to MQTT server: '" << SERVER_ADDRESS << "'"
-                  << exc << std::endl;
+        std::cerr << "\nERROR: Unable to connect to MQTT server: '" << serverURI << "'" << exc
+                  << std::endl;
         return 1;
     }
 

@@ -81,7 +81,6 @@ using callback_ptr = callback::ptr_t;
 using const_callback_ptr = callback::const_ptr_t;
 
 /////////////////////////////////////////////////////////////////////////////
-// end namespace mqtt
 }  // namespace mqtt
 
 #endif  // __mqtt_callback_h

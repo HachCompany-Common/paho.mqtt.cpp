@@ -195,7 +195,7 @@ TEST_CASE("publish full binary", "[topic]")
 //						topic_filter
 /////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("has_wildcards", "[topic_filter]")
+TEST_CASE("topic has_wildcards", "[topic_filter]")
 {
     REQUIRE(!topic_filter::has_wildcards(TOPIC));
 
@@ -203,13 +203,14 @@ TEST_CASE("has_wildcards", "[topic_filter]")
     REQUIRE(topic_filter::has_wildcards("some/multi/wild/#"));
 }
 
-TEST_CASE("matches", "[topic_filter]")
+TEST_CASE("topic matches", "[topic_filter]")
 {
     SECTION("no_wildcards")
     {
-        topic_filter filt{TOPIC};
+        topic_filter filt{"my/topic/name"};
 
-        REQUIRE(filt.matches(TOPIC));
+        REQUIRE(filt.matches("my/topic/name"));
+        REQUIRE(!filt.matches("my/topic/name/but/longer"));
         REQUIRE(!filt.matches("some/other/topic"));
     }
 
@@ -234,5 +235,43 @@ TEST_CASE("matches", "[topic_filter]")
 
         REQUIRE(!filt.matches("my/other/name"));
         REQUIRE(!filt.matches("my/other/id"));
+    }
+
+    // Th following sections are mostly borrowed from the Paho Python tests.
+    // They have a number of good corner cases that should and should not
+    // match.
+
+    SECTION("should_match")
+    {
+        REQUIRE(topic_filter{"foo/bar"}.matches("foo/bar"));
+        REQUIRE(
+            topic_filter{
+                "foo/+",
+            }
+                .matches("foo/bar")
+        );
+        REQUIRE(topic_filter{"foo/+/baz"}.matches("foo/bar/baz"));
+        REQUIRE(topic_filter{"foo/+/#"}.matches("foo/bar/baz"));
+        REQUIRE(topic_filter{"A/B/+/#"}.matches("A/B/B/C"));
+        REQUIRE(topic_filter{"#"}.matches("foo/bar/baz"));
+        REQUIRE(topic_filter{"#"}.matches("/foo/bar"));
+        REQUIRE(topic_filter{"/#"}.matches("/foo/bar"));
+        REQUIRE(topic_filter{"$SYS/bar"}.matches("$SYS/bar"));
+        REQUIRE(topic_filter{"$SYS/#"}.matches("$SYS/bar"));
+        REQUIRE(topic_filter{"foo/#"}.matches("foo/$bar"));
+        REQUIRE(topic_filter{"foo/+/baz"}.matches("foo/$bar/baz"));
+    }
+
+    SECTION("should_not_match")
+    {
+        REQUIRE(!topic_filter{"test/6/#"}.matches("test/3"));
+        REQUIRE(!topic_filter{"foo/bar"}.matches("foo"));
+        REQUIRE(!topic_filter{"foo/+"}.matches("foo/bar/baz"));
+        REQUIRE(!topic_filter{"foo/+/baz"}.matches("foo/bar/bar"));
+        REQUIRE(!topic_filter{"foo/+/#"}.matches("fo2/bar/baz"));
+        REQUIRE(!topic_filter{"/#"}.matches("foo/bar"));
+        REQUIRE(!topic_filter{"#"}.matches("$SYS/bar"));
+        REQUIRE(!topic_filter{"$BOB/bar"}.matches("$SYS/bar"));
+        REQUIRE(!topic_filter{"+/bar"}.matches("$SYS/bar"));
     }
 }

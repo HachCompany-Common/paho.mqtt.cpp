@@ -31,6 +31,8 @@
 #include "mqtt/response_options.h"
 #include "mqtt/token.h"
 
+#define UNUSED(x) (void)(x)
+
 namespace mqtt {
 
 /////////////////////////////////////////////////////////////////////////////
@@ -96,21 +98,30 @@ async_client::~async_client() { MQTTAsync_destroy(&cli_); }
 // connect token then calls any registered callbacks.
 void async_client::on_connected(void* context, char* cause)
 {
-    if (context) {
-        async_client* cli = static_cast<async_client*>(context);
+    if (!context)
+        return;
+
+    async_client* cli = static_cast<async_client*>(context);
+
+    auto tok = cli->connTok_;
+    if (tok)
+        tok->on_success(nullptr);
+
+    callback* cb = cli->userCallback_;
+    auto& connHandler = cli->connHandler_;
+    auto& que = cli->que_;
+
+    if (cb || connHandler || que) {
         string cause_str = cause ? string{cause} : string{};
 
-        auto tok = cli->connTok_;
-        if (tok)
-            tok->on_success(nullptr);
-
-        callback* cb = cli->userCallback_;
         if (cb)
             cb->connected(cause_str);
 
-        auto& connHandler = cli->connHandler_;
         if (connHandler)
             connHandler(cause_str);
+
+        if (que)
+            que->put(connected_event{cause_str});
     }
 }
 
@@ -122,21 +133,26 @@ void async_client::on_connected(void* context, char* cause)
 // connection.
 void async_client::on_connection_lost(void* context, char* cause)
 {
-    if (context) {
-        async_client* cli = static_cast<async_client*>(context);
+    if (!context)
+        return;
+
+    async_client* cli = static_cast<async_client*>(context);
+
+    callback* cb = cli->userCallback_;
+    auto& connLostHandler = cli->connLostHandler_;
+    auto& que = cli->que_;
+
+    if (cb || connLostHandler || que) {
         string cause_str = cause ? string(cause) : string();
 
-        callback* cb = cli->userCallback_;
         if (cb)
             cb->connection_lost(cause_str);
 
-        auto& connLostHandler = cli->connLostHandler_;
         if (connLostHandler)
             connLostHandler(cause_str);
 
-        consumer_queue_type& que = cli->que_;
         if (que)
-            que->put(const_message_ptr{});
+            que->put(connection_lost_event{cause_str});
     }
 }
 
@@ -146,18 +162,22 @@ void async_client::on_disconnected(
     void* context, MQTTProperties* cprops, MQTTReasonCodes reasonCode
 )
 {
-    if (context) {
-        async_client* cli = static_cast<async_client*>(context);
+    if (!context)
+        return;
 
-        auto& disconnectedHandler = cli->disconnectedHandler_;
-        if (disconnectedHandler) {
-            properties props(*cprops);
+    async_client* cli = static_cast<async_client*>(context);
+
+    auto& disconnectedHandler = cli->disconnectedHandler_;
+    auto& que = cli->que_;
+
+    if (disconnectedHandler || que) {
+        properties props(*cprops);
+
+        if (disconnectedHandler)
             disconnectedHandler(props, ReasonCode(reasonCode));
-        }
 
-        consumer_queue_type& que = cli->que_;
         if (que)
-            que->put(const_message_ptr{});
+            que->put(disconnected_event{std::move(props), ReasonCode(reasonCode)});
     }
 }
 
@@ -168,34 +188,32 @@ int async_client::on_message_arrived(
     void* context, char* topicName, int topicLen, MQTTAsync_message* msg
 )
 {
-    if (context) {
-        async_client* cli = static_cast<async_client*>(context);
-        callback* cb = cli->userCallback_;
-        consumer_queue_type& que = cli->que_;
-        message_handler& msgHandler = cli->msgHandler_;
+    if (!context)
+        return to_int(true);
 
-        if (cb || que || msgHandler) {
-            size_t len = (topicLen == 0) ? strlen(topicName) : size_t(topicLen);
+    async_client* cli = static_cast<async_client*>(context);
+    callback* cb = cli->userCallback_;
+    auto& que = cli->que_;
+    auto& msgHandler = cli->msgHandler_;
 
-            string topic{topicName, len};
-            auto m = message::create(std::move(topic), *msg);
+    if (cb || que || msgHandler) {
+        size_t len = (topicLen == 0) ? strlen(topicName) : size_t(topicLen);
 
-            if (msgHandler)
-                msgHandler(m);
+        string topic{topicName, len};
+        auto m = message::create(std::move(topic), *msg);
 
-            if (cb)
-                cb->message_arrived(m);
+        if (msgHandler)
+            msgHandler(m);
 
-            if (que)
-                que->put(m);
-        }
+        if (cb)
+            cb->message_arrived(m);
+
+        if (que)
+            que->put(m);
     }
 
     MQTTAsync_freeMessage(&msg);
     MQTTAsync_free(topicName);
-
-    // TODO: Should the user code determine the return value?
-    // The Java version does doesn't seem to...
     return to_int(true);
 }
 
@@ -299,21 +317,22 @@ void async_client::remove_token(token* tok)
 
 void async_client::set_callback(callback& cb)
 {
-    guard g(lock_);
-    userCallback_ = &cb;
-
+    {
+        guard g(lock_);
+        userCallback_ = &cb;
+    }
     int rc = MQTTAsync_setConnected(cli_, this, &async_client::on_connected);
 
     if (rc == MQTTASYNC_SUCCESS) {
-        rc = MQTTAsync_setCallbacks(
+        MQTTAsync_setCallbacks(
             cli_, this, &async_client::on_connection_lost, &async_client::on_message_arrived,
             nullptr /*&async_client::on_delivery_complete*/
         );
     }
-    else
+    else {
         MQTTAsync_setConnected(cli_, nullptr, nullptr);
 
-    if (rc != MQTTASYNC_SUCCESS) {
+        guard g(lock_);
         userCallback_ = nullptr;
         throw exception(rc);
     }
@@ -379,20 +398,13 @@ token_ptr async_client::connect(connect_options opts)
 {
     // TODO: We should update the MQTT version from the response
     //  	(when the server confirms the requested version)
-
-    // If the options specified a new MQTT protocol version, we should
-    // use it, otherwise default to the version requested when the client
-    // was created.
-    if (opts.opts_.MQTTVersion == 0 && mqttVersion_ >= 5)
-        opts.opts_.MQTTVersion = mqttVersion_;
-    else
-        mqttVersion_ = opts.opts_.MQTTVersion;
+    mqttVersion_ = opts.opts_.MQTTVersion;
 
     // The C lib is very picky about version and clean start/session
-    if (opts.opts_.MQTTVersion >= 5)
-        opts.opts_.cleansession = 0;
-    else
+    if (opts.opts_.MQTTVersion < 5)
         opts.opts_.cleanstart = 0;
+    else
+        opts.opts_.cleansession = 0;
 
     // TODO: If connTok_ is non-null, there could be a pending connect
     // which might complete after creating/assigning a new one. If that
@@ -415,25 +427,22 @@ token_ptr async_client::connect(connect_options opts)
         throw exception(rc);
     }
 
+    UNUSED(tmpTok);
     return connTok_;
 }
 
 token_ptr async_client::connect(connect_options opts, void* userContext, iaction_listener& cb)
 {
-    // If the options specified a new MQTT protocol version, we should
-    // use it, otherwise default to the version requested when the client
-    // was created.
-    if (opts.opts_.MQTTVersion == 0 && mqttVersion_ >= 5)
-        opts.opts_.MQTTVersion = mqttVersion_;
-    else
-        mqttVersion_ = opts.opts_.MQTTVersion;
+    // Remember the requested protocol version
+    mqttVersion_ = opts.opts_.MQTTVersion;
 
     // The C lib is very picky about version and clean start/session
-    if (opts.opts_.MQTTVersion >= 5)
-        opts.opts_.cleansession = 0;
-    else
+    if (opts.opts_.MQTTVersion < 5)
         opts.opts_.cleanstart = 0;
+    else
+        opts.opts_.cleansession = 0;
 
+    // Keep the old connTok_ alive (see above)
     auto tmpTok = connTok_;
     connTok_ = token::create(token::Type::CONNECT, *this, userContext, cb);
     add_token(connTok_);
@@ -449,6 +458,7 @@ token_ptr async_client::connect(connect_options opts, void* userContext, iaction
         throw exception(rc);
     }
 
+    UNUSED(tmpTok);
     return connTok_;
 }
 
@@ -529,10 +539,12 @@ delivery_token_ptr async_client::get_pending_delivery_token(int msgID) const
 
     if (msgID > 0) {
         guard g(lock_);
-        for (const auto& t : pendingDeliveryTokens_) {
-            if (t->get_message_id() == msgID)
-                return t;
-        }
+        const auto it = std::find_if(
+            pendingDeliveryTokens_.cbegin(), pendingDeliveryTokens_.cend(),
+            [msgID](const auto& t) { return t->get_message_id() == msgID; }
+        );
+        if (it != pendingDeliveryTokens_.end())
+            return *it;
     }
     return delivery_token_ptr();
 }
@@ -553,18 +565,20 @@ std::vector<delivery_token_ptr> async_client::get_pending_delivery_tokens() cons
 // Publish
 
 delivery_token_ptr async_client::publish(
-    string_ref topic, const void* payload, size_t n, int qos, bool retained
+    string_ref topic, const void* payload, size_t n, int qos, bool retained,
+    const properties& props /*=properties()*/
 )
 {
-    auto msg = message::create(std::move(topic), payload, n, qos, retained);
+    auto msg = message::create(std::move(topic), payload, n, qos, retained, props);
     return publish(std::move(msg));
 }
 
 delivery_token_ptr async_client::publish(
-    string_ref topic, binary_ref payload, int qos, bool retained
+    string_ref topic, binary_ref payload, int qos, bool retained,
+    const properties& props /*=properties()*/
 )
 {
-    auto msg = message::create(std::move(topic), std::move(payload), qos, retained);
+    auto msg = message::create(std::move(topic), std::move(payload), qos, retained, props);
     return publish(std::move(msg));
 }
 
@@ -846,29 +860,98 @@ void async_client::start_consuming()
     // TODO: Should we replace user callback?
     // userCallback_ = nullptr;
 
-    que_.reset(new thread_queue<const_message_ptr>);
+    que_.reset(new thread_queue<event>);
 
     int rc = MQTTAsync_setCallbacks(
         cli_, this, &async_client::on_connection_lost, &async_client::on_message_arrived,
         nullptr
     );
 
-    if (rc != MQTTASYNC_SUCCESS)
-        throw exception(rc);
+    check_ret(rc);
+    check_ret(::MQTTAsync_setConnected(cli_, this, &async_client::on_connected));
+    check_ret(::MQTTAsync_setDisconnected(cli_, this, &async_client::on_disconnected));
 }
 
 void async_client::stop_consuming()
 {
     try {
         disable_callbacks();
-        que_.reset();
+        if (que_)
+            que_->close();
     }
     catch (...) {
-        que_.reset();
+        if (que_)
+            que_->close();
         throw;
     }
 }
 
+event async_client::consume_event()
+{
+    event evt;
+    try {
+        evt = que_->get();
+    }
+    catch (queue_closed&) {
+        evt = event{shutdown_event{}};
+    }
+    return evt;
+}
+
+bool async_client::try_consume_event(event* evt)
+{
+    bool res = false;
+    try {
+        res = que_->try_get(evt);
+    }
+    catch (queue_closed&) {
+        *evt = event{shutdown_event{}};
+        res = true;
+    }
+    return res;
+}
+
+const_message_ptr async_client::consume_message()
+{
+    if (!que_)
+        throw mqtt::exception(-1, "Consumer not started");
+
+    // For backward compatibility we ignore the 'connected' events,
+    // whereas disconnected/lost return an empty pointer.
+    while (true) {
+        auto evt = consume_event();
+
+        if (const auto* pval = evt.get_message_if())
+            return *pval;
+
+        if (evt.is_any_disconnect())
+            return const_message_ptr{};
+    }
+}
+
+bool async_client::try_consume_message(const_message_ptr* msg)
+{
+    if (!que_)
+        throw mqtt::exception(-1, "Consumer not started");
+
+    event evt;
+
+    while (true) {
+        if (!try_consume_event(&evt))
+            return false;
+
+        if (const auto* pval = evt.get_message_if()) {
+            *msg = std::move(*pval);
+            break;
+        }
+
+        if (evt.is_any_disconnect()) {
+            *msg = const_message_ptr{};
+            break;
+        }
+    }
+    return true;
+}
+
 /////////////////////////////////////////////////////////////////////////////
-// end namespace mqtt
 }  // namespace mqtt

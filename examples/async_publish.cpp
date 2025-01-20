@@ -7,6 +7,7 @@
 //
 // The sample demonstrates:
 //  - Connecting to an MQTT server/broker
+//  - Using a connect timeout
 //  - Publishing messages
 //  - Default file persistence
 //  - Last will and testament
@@ -41,8 +42,9 @@
 #include "mqtt/async_client.h"
 
 using namespace std;
+using namespace std::chrono;
 
-const string DFLT_SERVER_ADDRESS{"mqtt://localhost:1883"};
+const string DFLT_SERVER_URI{"mqtt://localhost:1883"};
 const string CLIENT_ID{"paho_cpp_async_publish"};
 const string PERSIST_DIR{"./persist"};
 
@@ -134,16 +136,17 @@ int main(int argc, char* argv[])
     // session or Client ID unless it's using persistence, then the local
     // library requires an ID to identify the persistence files.
 
-    string address = (argc > 1) ? string(argv[1]) : DFLT_SERVER_ADDRESS,
-           clientID = (argc > 2) ? string(argv[2]) : CLIENT_ID;
+    string serverURI = (argc > 1) ? string{argv[1]} : DFLT_SERVER_URI,
+           clientID = (argc > 2) ? string{argv[2]} : CLIENT_ID;
 
-    cout << "Initializing for server '" << address << "'..." << endl;
-    mqtt::async_client client(address, clientID, PERSIST_DIR);
+    cout << "Initializing for server '" << serverURI << "'..." << endl;
+    mqtt::async_client client(serverURI, clientID, PERSIST_DIR);
 
     callback cb;
     client.set_callback(cb);
 
     auto connOpts = mqtt::connect_options_builder()
+                        .connect_timeout(5s)
                         .clean_session()
                         .will(mqtt::message(TOPIC, LWT_PAYLOAD, QOS, false))
                         .finalize();

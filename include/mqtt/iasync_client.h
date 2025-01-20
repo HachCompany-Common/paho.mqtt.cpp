@@ -30,6 +30,7 @@
 #include "mqtt/connect_options.h"
 #include "mqtt/delivery_token.h"
 #include "mqtt/disconnect_options.h"
+#include "mqtt/event.h"
 #include "mqtt/exception.h"
 #include "mqtt/iaction_listener.h"
 #include "mqtt/iclient_persistence.h"
@@ -206,7 +207,8 @@ public:
      *  	   token will be passed to callback methods if set.
      */
     virtual delivery_token_ptr publish(
-        string_ref topic, const void* payload, size_t n, int qos, bool retained
+        string_ref topic, const void* payload, size_t n, int qos, bool retained,
+		const properties &props=properties()
     ) = 0;
     /**
      * Publishes a message to a topic on the server
@@ -248,7 +250,8 @@ public:
      *  	   token will be passed to callback methods if set.
      */
     virtual delivery_token_ptr publish(
-        string_ref topic, binary_ref payload, int qos, bool retained
+        string_ref topic, binary_ref payload, int qos, bool retained,
+		const properties &props=properties()
     ) = 0;
     /**
      * Publishes a message to a topic on the server.
@@ -449,6 +452,39 @@ public:
      */
     virtual void stop_consuming() = 0;
     /**
+     * This clears the consumer queue, discarding any pending event.
+     */
+    virtual void clear_consumer() {}
+    /**
+     * Determines if the consumer queue has been closed.
+     * Once closed, any events in the queue can still be read, but no new
+     * events can be added to it.
+     * @return @true if the consumer queue has been closed, @false
+     *         otherwise.
+     */
+    virtual bool consumer_closed() noexcept {
+        return false;
+    }
+    /**
+     * Determines if the consumer queue is "done" (closed and empty).
+     * Once the queue is done, no more events can be added or removed fom
+     * the queue.
+     * @return @true if the consumer queue is closed and empty, @false
+     *         otherwise.
+     */
+    virtual bool consumer_done() noexcept {
+        return false;
+    }
+    /**
+     * Gets the number of events available for immediate consumption.
+     * Note that this retrieves the number of "raw" events, not messages,
+     * e.g. may include a connected_event which is not returned by try_consume_message().
+     * When polling the queue from multiple threads, prefer using try_consume_event(),
+     * as the event count may change between checking the size and actual retrieval.
+     * @return the number of events in the queue.
+     */
+    virtual std::size_t consumer_queue_size() const { return 0; }
+    /**
      * Read the next message from the queue.
      * This blocks until a new message arrives.
      * @return The message and topic.
@@ -461,6 +497,24 @@ public:
      *  	   available.
      */
     virtual bool try_consume_message(const_message_ptr* msg) = 0;
+    /**
+     * Read the next event from the queue.
+     * This blocks until a new message arrives.
+     * @return The message and topic.
+     */
+    virtual event consume_event() {
+        return event{};
+    }
+    /**
+     * Try to read the next message from the queue without blocking.
+     * @param evt Pointer to the value to receive the event
+	 * @return @em true is an event was received, @em false if no event was
+	 *  	   available.
+     */
+    virtual bool try_consume_event(event* evt) {
+        (void)evt;
+        return false;
+    }
 };
 
 /////////////////////////////////////////////////////////////////////////////

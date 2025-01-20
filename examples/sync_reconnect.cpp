@@ -49,7 +49,7 @@
 using namespace std;
 using namespace std::chrono;
 
-const std::string DFLT_SERVER_ADDRESS{"mqtt://localhost:1883"};
+const std::string DFLT_SERVER_URI{"mqtt://localhost:1883"};
 
 // The QoS for sending data
 const int QOS = 1;
@@ -74,14 +74,14 @@ uint64_t timestamp()
 int main(int argc, char* argv[])
 {
     // The server URI (address)
-    string address = (argc > 1) ? string(argv[1]) : DFLT_SERVER_ADDRESS;
+    string serverURI = (argc > 1) ? string{argv[1]} : DFLT_SERVER_URI;
 
     // The amount of time to run (in sec). Zero means "run forever".
     uint64_t trun = (argc > 2) ? stoll(argv[2]) : 0LL;
 
-    cout << "Initializing for server '" << address << "'..." << endl;
+    cout << "Initializing for server '" << serverURI << "'..." << endl;
 
-    mqtt::client cli(address, "");
+    mqtt::client cli(serverURI, "");
 
     auto connOpts = mqtt::connect_options_builder().clean_session().finalize();
 

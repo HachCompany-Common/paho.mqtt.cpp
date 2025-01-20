@@ -44,16 +44,18 @@
 using namespace std;
 using namespace std::chrono;
 
-const string SERVER_ADDRESS{"mqtt://localhost:1883"};
+const string DFLT_SERVER_URI{"mqtt://localhost:1883"};
 const string CLIENT_ID{"paho_cpp_sync_consume"};
 
 /////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char* argv[])
 {
-    mqtt::client cli(SERVER_ADDRESS, CLIENT_ID);
+    auto serverURI = (argc > 1) ? std::string{argv[1]} : DFLT_SERVER_URI;
 
-    auto connOpts = mqtt::connect_options_builder()
+    mqtt::client cli(serverURI, CLIENT_ID);
+
+    auto connOpts = mqtt::connect_options_builder::v3()
                         .user_name("user")
                         .password("passwd")
                         .keep_alive_interval(seconds(30))

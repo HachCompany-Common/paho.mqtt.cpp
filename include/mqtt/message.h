@@ -160,8 +160,7 @@ public:
     ~message() {}
 
     /**
-     * Constructs a message with the specified array as a payload, and all
-     * other values set to defaults.
+     * Constructs a message with the specified values.
      * @param topic The message topic
      * @param payload the bytes to use as the message payload
      * @param len the number of bytes in the payload
@@ -383,9 +382,15 @@ using const_message_ptr = message::const_ptr_t;
  * @param topic The message topic
  * @param payload the bytes to use as the message payload
  * @param len the number of bytes in the payload
+ * @param qos The quality of service for the message.
+ * @param retained Whether the message should be retained by the broker.
+ * @param props The MQTT v5 properties for the message.
  */
-inline message_ptr make_message(string_ref topic, const void* payload, size_t len) {
-    return mqtt::message::create(std::move(topic), payload, len);
+inline message_ptr make_message(
+    string_ref topic, const void* payload, size_t len, int qos, bool retained,
+	const properties& props = properties()
+) {
+    return mqtt::message::create(std::move(topic), payload, len, qos, retained, props);
 }
 
 /**
@@ -394,23 +399,9 @@ inline message_ptr make_message(string_ref topic, const void* payload, size_t le
  * @param topic The message topic
  * @param payload the bytes to use as the message payload
  * @param len the number of bytes in the payload
- * @param qos The quality of service for the message.
- * @param retained Whether the message should be retained by the broker.
  */
-inline message_ptr make_message(
-    string_ref topic, const void* payload, size_t len, int qos, bool retained
-) {
-    return mqtt::message::create(std::move(topic), payload, len, qos, retained);
-}
-
-/**
- * Constructs a message with the specified buffer as a payload, and
- * all other values set to defaults.
- * @param topic The message topic
- * @param payload A string to use as the message payload.
- */
-inline message_ptr make_message(string_ref topic, binary_ref payload) {
-    return mqtt::message::create(std::move(topic), std::move(payload));
+inline message_ptr make_message(string_ref topic, const void* payload, size_t len) {
+    return mqtt::message::create(std::move(topic), payload, len);
 }
 
 /**
@@ -421,9 +412,20 @@ inline message_ptr make_message(string_ref topic, binary_ref payload) {
  * @param retained Whether the message should be retained by the broker.
  */
 inline message_ptr make_message(
-    string_ref topic, binary_ref payload, int qos, bool retained
+    string_ref topic, binary_ref payload, int qos, bool retained,
+	const properties& props = properties()
 ) {
-    return mqtt::message::create(std::move(topic), std::move(payload), qos, retained);
+    return mqtt::message::create(std::move(topic), std::move(payload), qos, retained, props);
+}
+
+/**
+ * Constructs a message with the specified buffer as a payload, and
+ * all other values set to defaults.
+ * @param topic The message topic
+ * @param payload A string to use as the message payload.
+ */
+inline message_ptr make_message(string_ref topic, binary_ref payload) {
+    return mqtt::message::create(std::move(topic), std::move(payload));
 }
 
 /////////////////////////////////////////////////////////////////////////////

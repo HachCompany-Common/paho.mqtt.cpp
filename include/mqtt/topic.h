@@ -211,6 +211,22 @@ public:
      * 				 '+' and '#'.
      */
     explicit topic_filter(const string& filter);
+	/**
+	 * Determins if the character is a wildcard, '+' or '#'
+	 * @param c The character to check
+	 * @return @em true if `c` is a wildcard, '+' or '#'
+	 */
+	static bool is_wildcard(char c) {
+		return c == '+' || c == '#';
+	}
+	/**
+	 * Determins if the string (field) is a wildcard, "+" or "#"
+	 * @param s The string to check
+	 * @return @em true if `c` is a wildcard, "+" or "#"
+	 */
+	static bool is_wildcard(const string& s) {
+		return s.size() == 1 && is_wildcard(s[0]);
+	}
     /**
      * Determines if the specified topic/filter contains any wildcards.
      *

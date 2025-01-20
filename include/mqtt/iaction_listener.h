@@ -77,7 +77,6 @@ using iaction_listener_ptr = iaction_listener::ptr_t;
 using const_iaction_listener_ptr = iaction_listener::const_ptr_t;
 
 /////////////////////////////////////////////////////////////////////////////
-// end namespace mqtt
 }  // namespace mqtt
 
 #endif  // __mqtt_iaction_listener_h

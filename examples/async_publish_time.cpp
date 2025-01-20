@@ -20,7 +20,7 @@
 //  - Sampling a value
 //  - Publishing messages using a `topic` object
 //  - Last will and testament
-//  - Callbacks with lambdas
+//  - Callbacks with lambdas (on connect and disconnect)
 //  - Using `create_options`
 //  - Creating options with builder classes
 //  - Offline buffering in the client
@@ -44,6 +44,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <csignal>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -55,19 +56,25 @@
 using namespace std;
 using namespace std::chrono;
 
-const std::string DFLT_SERVER_ADDRESS{"mqtt://localhost:1883"};
+const std::string DFLT_SERVER_URI{"mqtt://localhost:1883"};
 
 // The QoS for sending data
 const int QOS = 1;
 
 // How often to sample the "data"
-const auto SAMPLE_PERIOD = milliseconds(5);
+const auto SAMPLE_PERIOD = 5ms;
 
 // How much the "data" needs to change before we publish a new value.
 const int DELTA_MS = 100;
 
 // How many to buffer while off-line
 const int MAX_BUFFERED_MESSAGES = 1200;
+
+// Atomic flag to tell the main loop to exit.
+atomic<bool> quit{false};
+
+// Handler for ^C (SIGINT)
+void ctrlc_handler(int) { quit = true; }
 
 // --------------------------------------------------------------------------
 // Gets the current time as the number of milliseconds since the epoch:
@@ -86,7 +93,7 @@ uint64_t timestamp()
 int main(int argc, char* argv[])
 {
     // The server URI (address)
-    string serverURI = (argc > 1) ? string(argv[1]) : DFLT_SERVER_ADDRESS;
+    string serverURI = (argc > 1) ? string{argv[1]} : DFLT_SERVER_URI;
 
     // The amount of time to run (in ms). Zero means "run forever".
     uint64_t trun = (argc > 2) ? stoll(argv[2]) : 0LL;
@@ -118,6 +125,7 @@ int main(int argc, char* argv[])
     auto connOpts = mqtt::connect_options_builder()
                         .clean_session()
                         .will(willMsg)
+                        .keep_alive_interval(10s)
                         .automatic_reconnect(seconds(1), seconds(10))
                         .finalize();
 
@@ -130,17 +138,20 @@ int main(int argc, char* argv[])
         auto top = mqtt::topic(cli, "data/time", QOS);
         cout << "Publishing data..." << endl;
 
+        // Install a ^C handler for user to signal when to exit
+        signal(SIGINT, ctrlc_handler);
+
+        // Sync clock to start of delta period
         while (timestamp() % DELTA_MS != 0);
 
         uint64_t t = timestamp(), tlast = t, tstart = t;
-
         top.publish(to_string(t));
 
-        while (true) {
+        while (!quit) {
             this_thread::sleep_for(SAMPLE_PERIOD);
 
             t = timestamp();
-            // cout << t << endl;
+
             if (abs(int(t - tlast)) >= DELTA_MS)
                 top.publish(to_string(tlast = t));
 

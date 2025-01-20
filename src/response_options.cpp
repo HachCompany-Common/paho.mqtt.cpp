@@ -1,7 +1,7 @@
 // response_options.cpp
 
 /*******************************************************************************
- * Copyright (c) 2019-2024 Frank Pagliughi <fpagliughi@mindspring.com>
+ * Copyright (c) 2019-2025 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v2.0
@@ -30,18 +30,43 @@ response_options::
 }
 
 response_options::response_options(const response_options& other)
-    : opts_(other.opts_), tok_(other.tok_), props_(other.props_)
+    : opts_{other.opts_}, tok_{other.tok_}, props_{other.props_}, subOpts_{other.subOpts_}
+{
+    update_c_struct();
+}
+
+response_options::response_options(response_options&& other)
+    : opts_{other.opts_},
+      tok_{std::move(other.tok_)},
+      props_{std::move(other.props_)},
+      subOpts_{std::move(other.subOpts_)}
 {
     update_c_struct();
 }
 
 response_options& response_options::operator=(const response_options& rhs)
 {
-    opts_ = rhs.opts_;
-    tok_ = rhs.tok_;
-    props_ = rhs.props_;
+    if (&rhs != this) {
+        opts_ = rhs.opts_;
+        tok_ = rhs.tok_;
+        props_ = rhs.props_;
+        subOpts_ = rhs.subOpts_;
 
-    update_c_struct();
+        update_c_struct();
+    }
+    return *this;
+}
+
+response_options& response_options::operator=(response_options&& rhs)
+{
+    if (&rhs != this) {
+        opts_ = rhs.opts_;
+        tok_ = std::move(rhs.tok_);
+        props_ = std::move(rhs.props_);
+        subOpts_ = std::move(rhs.subOpts_);
+
+        update_c_struct();
+    }
     return *this;
 }
 
@@ -80,7 +105,14 @@ void response_options::set_subscribe_options(const subscribe_options& opts)
     opts_.subscribeOptions = opts.opts_;
 }
 
-void response_options::set_subscribe_options(const std::vector<subscribe_options>& opts)
+std::vector<subscribe_options> response_options::get_subscribe_many_options() const
+{
+    std::vector<subscribe_options> opts;
+    for (const auto& opt : subOpts_) opts.push_back(subscribe_options{opt});
+    return opts;
+}
+
+void response_options::set_subscribe_many_options(const std::vector<subscribe_options>& opts)
 {
     subOpts_.clear();
     for (const auto& opt : opts) subOpts_.push_back(opt.opts_);

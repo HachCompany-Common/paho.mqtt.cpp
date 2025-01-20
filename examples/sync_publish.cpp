@@ -36,7 +36,7 @@
 
 #include "mqtt/client.h"
 
-const std::string SERVER_ADDRESS{"mqtt://localhost:1883"};
+const std::string DFLT_SERVER_URI{"mqtt://localhost:1883"};
 const std::string TOPIC{"hello"};
 
 const std::string PAYLOAD1{"Hello World!"};
@@ -165,9 +165,11 @@ public:
 
 int main(int argc, char* argv[])
 {
+    auto serverURI = (argc > 1) ? std::string{argv[1]} : DFLT_SERVER_URI;
+
     std::cout << "Initializing..." << std::endl;
     sample_mem_persistence persist;
-    mqtt::client client(SERVER_ADDRESS, "", &persist);
+    mqtt::client client(serverURI, "", &persist);
 
     user_callback cb;
     client.set_callback(cb);

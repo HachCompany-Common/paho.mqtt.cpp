@@ -393,3 +393,16 @@ TEST_CASE("ssl_options set empty strings", "[options]")
     REQUIRE(c_struct.protos == nullptr);
     REQUIRE(c_struct.protos_len == 0);
 }
+
+// ----------------------------------------------------------------------
+// Test if empty strings gives nullptr opts
+// ----------------------------------------------------------------------
+
+TEST_CASE("ssl_options test error handler", "[options]")
+{
+    mqtt::ssl_options opts{orgOpts};
+
+    orgOpts.set_error_handler([](const std::string& msg) {
+        std::cerr << "SSL Error: " << msg << std::endl;
+    });
+}

@@ -40,7 +40,7 @@
 
 using namespace std;
 
-const string DFLT_SERVER_ADDRESS{"mqtt://localhost:1883"};
+const string DFLT_SERVER_URI{"mqtt://localhost:1883"};
 
 const string TOPIC{"test"};
 const int QOS = 1;
@@ -56,10 +56,10 @@ const auto TIMEOUT = std::chrono::seconds(10);
 
 int main(int argc, char* argv[])
 {
-    string address = (argc > 1) ? string(argv[1]) : DFLT_SERVER_ADDRESS;
+    string serverURI = (argc > 1) ? string(argv[1]) : DFLT_SERVER_URI;
 
-    cout << "Initializing for server '" << address << "'..." << endl;
-    mqtt::async_client cli(address, "");
+    cout << "Initializing for server '" << serverURI << "'..." << endl;
+    mqtt::async_client cli(serverURI, "");
 
     cout << "  ...OK" << endl;
 

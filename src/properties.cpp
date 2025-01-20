@@ -201,7 +201,7 @@ std::ostream& operator<<(std::ostream& os, const property& prop)
 
     switch (::MQTTProperty_getType(MQTTPropertyCodes(prop.type()))) {
         case MQTTPROPERTY_TYPE_BYTE:
-            os << get<uint8_t>(prop);
+            os << unsigned(get<uint8_t>(prop));
             break;
 
         case MQTTPROPERTY_TYPE_TWO_BYTE_INTEGER:
@@ -260,10 +260,11 @@ properties& properties::operator=(properties&& rhs)
     return *this;
 }
 
-property properties::get(property::code propid, size_t idx /*=0*/)
+property properties::get(property::code propid, size_t idx /*=0*/) const
 {
-    MQTTProperty* prop =
-        MQTTProperties_getPropertyAt(&props_, MQTTPropertyCodes(propid), int(idx));
+    MQTTProperty* prop = MQTTProperties_getPropertyAt(
+        const_cast<MQTTProperties*>(&props_), MQTTPropertyCodes(propid), int(idx)
+    );
     if (!prop)
         throw bad_cast();
 
@@ -271,5 +272,4 @@ property properties::get(property::code propid, size_t idx /*=0*/)
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// end namespace 'mqtt'
 }  // namespace mqtt

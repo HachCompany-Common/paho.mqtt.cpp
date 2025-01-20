@@ -116,7 +116,8 @@ public:
     bool is_connected() const override { return true; };
 
     mqtt::delivery_token_ptr publish(
-        string_ref topic, const void* payload, size_t n, int qos, bool retained
+        string_ref topic, const void* payload, size_t n, int qos, bool retained,
+		const properties &props=properties()
     ) override
     {
         auto msg = mqtt::message::create(topic, payload, n, qos, retained);
@@ -130,7 +131,8 @@ public:
     };
 
     mqtt::delivery_token_ptr publish(
-        string_ref topic, binary_ref payload, int qos, bool retained
+        string_ref topic, binary_ref payload, int qos, bool retained,
+		const properties &props=properties()
     ) override
     {
         auto msg = mqtt::message::create(topic, payload, qos, retained);
@@ -239,6 +241,9 @@ public:
     const_message_ptr consume_message() override { return const_message_ptr{}; }
 
     bool try_consume_message(const_message_ptr*) override { return false; }
+
+    event consume_event() override { return const_message_ptr{}; }
+    bool try_consume_event(event* evt) override { return false; }
 };
 
 /////////////////////////////////////////////////////////////////////////////

@@ -33,31 +33,18 @@ To keep up with the latest announcements for this project, or to ask questions:
 
 **Email:** [Eclipse Paho Mailing List](https://accounts.eclipse.org/mailing-list/paho-dev)
 
-### Unreleased Features in This Branch
+### What's New in v1.5.0
 
-- Required C++ standard raised to C++17
-- CMake minimum required version raised to v3.12 
-- Reformat the sources and added a .clang-format file (a project master and a slightly-different one for headers).
-- Clients always created for v5 persistence format, making it universal for any connection.
-    - If the application specifies a version it is kept as a hint for default connections.
-    - The version for the connection should be specified in the connect options.
+The latest update moves the codebase to C++17 and adds supoort for UNIX-domain sockets. The update also fixes a number of build issues, and targets the latest Paho C release, v1.3.14.
 
-
-### What's New in v1.4.0
-
-The v1.4.0 release is primarily concerned with reorganizing the sources and fixing a number of CMake build issues, particularly to get the Paho C submodule build working with the existing C library, fix transient dependencies, and get the Windows DLL (maybe, finally) working properly.
-
-- Ability to build the Paho C library automatically (now working)
-    - Reworked the CMake build so that 'PAHO_WITH_MQTT_C' option properly compiles the existing Paho C v1.3.13
-    - Moved 'src/externals/' to top-level
-- Reorganized the source tree:
-    - Moved header files to top-level 'include/' directory.
-    - Moved 'src/sampless/' to top-level and renamed 'examples/'
-    - Removed the ob
-- Fixed and optimized 'topic_matcher' trie collection
-- Added some missing Eclipse/Paho legal documents to the repo.
-
-For a full list of updates see the [CHANGELOG](https://github.com/eclipse/paho.mqtt.cpp/blob/master/CHANGELOG.md)
+- Update the code base to C++17
+- Support for the pending Paho C v1.3.14 release.
+- Support for UNIX-domain sockets
+- Reorganize and reformat the sources and added a .clang-format capability.
+- Create universal client instances that can connect using v3 or v5. (i.e. no more instances that are only v3 capable)
+- Bump the CMake to v3.12
+- Fix a number of CMake build issues
+- Update the GitHub CI
 
 ## Contributing
 
@@ -98,7 +85,7 @@ This requires the CMake option `PAHO_WITH_MQTT_C` set.
 ```
 $ git clone https://github.com/eclipse/paho.mqtt.cpp
 $ cd paho.mqtt.cpp
-$ git co v1.4.0
+$ git co v1.5.0
 
 $ git submodule init
 $ git submodule update
@@ -138,7 +125,7 @@ $ sudo apt-get install doxygen graphviz
 
 Unit tests are built using _Catch2_.
 
-_Catch2_ can be found here: [Catch2](https://github.com/catchorg/Catch2).  You must download and install _Catch2_ to build and run the unit tests locally.
+_Catch2_ can be found here: [Catch2](https://github.com/catchorg/Catch2).  You must download and install _Catch2_ to build and run the unit tests locally. Currently _Catch2_ versions v2.x and v3.x are supported.
 
 #### Building the Paho C library
 
@@ -174,7 +161,7 @@ If the Paho C library is not already installed, the recommended version can be b
 ```
 $ git clone https://github.com/eclipse/paho.mqtt.cpp
 $ cd paho.mqtt.cpp
-$ git co v1.4.0
+$ git co v1.5.0
 $ git submodule init
 $ git submodule update
 
@@ -262,11 +249,16 @@ The library supports connecting to an MQTT server/broker using TCP, SSL/TLS, and
     "ws://<host>:<port>"    - Unsecure websockets
     "wss://<host>:<port>"   - Secure websockets
 
+	"unix://<path>"          - A UNIX-domain socket on the local machine.
+	                           (*nix systems, only)
+
 The "mqtt://" and "tcp://" schemas are identical. They indicate an insecure connection over TCP. The "mqtt://" variation is new for the library, but becoming more common across different MQTT libraries.
 
 Similarly, the "mqtts://" and "ssl://" schemas are identical. They specify a secure connection over SSL/TLS sockets.
 
 Note that to use any of the secure connect options, "mqtts://, "ssl://", or "wss://" you must compile the library with the `PAHO_WITH_SSL=ON` CMake option to include OpenSSL. In addition, you _must_ specify `ssl_options` when you connect to the broker - i.e. you must add an instance of `ssl_options` to the `connect_options` when calling `connect()`.
+
+The use of Unix-domain sockets is only available on *nix-style systems like Linux and macOS. It is not available on Windows. It requires the Paho C library built with the CMake option of PAHO_WITH_UNIX_SOCKETS=ON. This is done by default when building the C library automatically with the Git submodule.
 
 ## _Catch2_ Unit Tests
 

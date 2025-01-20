@@ -18,6 +18,8 @@
 
 #include "mqtt/topic.h"
 
+#include <algorithm>
+
 #include "mqtt/async_client.h"
 
 namespace mqtt {
@@ -94,11 +96,9 @@ bool topic_filter::has_wildcards(const string& filter)
 
 bool topic_filter::has_wildcards() const
 {
-    for (auto& f : fields_) {
-        if (f == "+" || f == "#")
-            return true;
-    }
-    return false;
+    return std::any_of(fields_.cbegin(), fields_.cend(), [](const auto& f) {
+        return is_wildcard(f);
+    });
 }
 
 // See if the topic matches this filter.
@@ -108,9 +108,26 @@ bool topic_filter::has_wildcards() const
 bool topic_filter::matches(const string& topic) const
 {
     auto n = fields_.size();
-    auto topic_fields = topic::split(topic);
 
-    if (n > topic_fields.size()) {
+    auto topic_fields = topic::split(topic);
+    auto nt = topic_fields.size();
+
+    // Filter can't match a topic that is shorter
+    if (n > nt) {
+        return false;
+    }
+
+    // Might match a longer topic, but only with '#' wildcard
+    if (n < nt && fields_[n - 1] != "#") {
+        return false;
+    }
+
+    // Topics starting with '$' don't match wildcards in the first field
+    // MQTT v5 Spec, Section 4.7.2:
+    // https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901246
+
+    if (n > 0 && is_wildcard(fields_[0]) && nt > 0 && topic_fields[0].size() > 0 &&
+        topic_fields[0][0] == '$') {
         return false;
     }
 

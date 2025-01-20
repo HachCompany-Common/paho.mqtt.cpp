@@ -35,8 +35,15 @@ namespace mqtt {
 
 /**
  * The MQTT v5 subscription options.
+ *
+ * The subscribe options are bitfields in the payload of a SUBSCRIBE packet,
+ * forming a single options byte for each topic filter in the subscription.
+ *
+ * These were added in MQTT v5. The default (zero/false) value for each
+ * field gives the behavior that was present in MQTT v3.1.1. To get a new
+ * behavior the field(s) must be set.
+ *
  * These are defined in section 3.8.3.1 of the MQTT v5 spec.
- * The defaults use the behavior that was present in MQTT v3.1.1.
  */
 class subscribe_options
 {
@@ -54,8 +61,15 @@ public:
     using const_ptr_t = std::shared_ptr<const subscribe_options>;
 
     /** Don't receive our own publications */
-    static constexpr bool SUBSCRIBE_NO_LOCAL = true;
+    static constexpr bool NO_LOCAL = true;
     /** Receive our own publications */
+    static constexpr bool LOCAL = false;
+
+    /** @deprecated Don't receive our own publications */
+    [[deprecated("Use NO_LOCAL")]]
+    static constexpr bool SUBSCRIBE_NO_LOCAL = true;
+    /** @deprecated Receive our own publications (obsolete name) */
+    [[deprecated("Use LOCAL")]]
     static constexpr bool SUBSCRIBE_LOCAL = false;
 
     /**
@@ -96,7 +110,7 @@ public:
      *  	@li (DONT_SEND_RETAINED, 2) Not at the time of subscribe
      */
     explicit subscribe_options(
-        bool noLocal, byte retainAsPublished = false,
+        bool noLocal, bool retainAsPublished = false,
         RetainHandling retainHandling = SEND_RETAINED_ON_SUBSCRIBE
     )
         : opts_(MQTTSubscribe_options_initializer) {
@@ -104,6 +118,19 @@ public:
         opts_.retainAsPublished = retainAsPublished ? 1 : 0;
         opts_.retainHandling = (unsigned char)retainHandling;
     }
+    /**
+     * Creates the set of subscribe options from an underlying C struct.
+     * @param opts The Paho C subscribe options
+     */
+    explicit subscribe_options(MQTTSubscribe_options opts) : opts_{opts} {}
+
+#if defined(UNIT_TESTS)
+    /**
+     * Expose the underlying C struct for the unit tests.
+     */
+    const auto& c_struct() const { return opts_; }
+#endif
+
     /**
      * Gets the value of the "no local" flag.
      * @return Whether the server should send back our own publications, if
@@ -127,7 +154,7 @@ public:
      * @param on Whether to keep the retained flag as in the original
      *  		 published message.
      */
-    void set_retain_as_published(bool on) { opts_.retainAsPublished = on ? 1 : 0; }
+    void set_retain_as_published(bool on = true) { opts_.retainAsPublished = on ? 1 : 0; }
     /**
      * Gets the "retain handling" option.
      * @return When to send retained messages:

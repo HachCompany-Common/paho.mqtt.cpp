@@ -26,7 +26,7 @@
 //
 
 /*******************************************************************************
- * Copyright (c) 2013-2023 Frank Pagliughi <fpagliughi@mindspring.com>
+ * Copyright (c) 2013-2024 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v2.0
@@ -41,21 +41,17 @@
  *    Frank Pagliughi - initial implementation and documentation
  *******************************************************************************/
 
-#if !defined(_WIN32)
-    #include <dirent.h>
-    #include <sys/stat.h>
-    #include <sys/types.h>
-    #include <unistd.h>
-
-    #include <fstream>
-#endif
-
 #include <algorithm>
 #include <chrono>
+#include <condition_variable>
+#include <csignal>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <mutex>
 #include <random>
 #include <string>
 #include <thread>
@@ -64,25 +60,54 @@
 
 using namespace std;
 using namespace std::chrono;
+namespace fs = std::filesystem;
 
-const std::string DFLT_ADDRESS{"mqtt://localhost:1883"};
+const std::string DFLT_SERVER_URI{"mqtt://localhost:1883"};
 const std::string CLIENT_ID{"paho-cpp-data-publish"};
 
 const string TOPIC{"data/rand"};
 const int QOS = 1;
 
+// How often we output a data point
 const auto PERIOD = seconds(5);
 
+// The number of out-bound messages we will buffer locally when disconnected.
 const int MAX_BUFFERED_MSGS = 120;  // 120 * 5sec => 10min off-line buffering
 
-const string PERSIST_DIR{"data-persist"};
+// Top-level directory to keep persistence data
+const fs::path PERSIST_DIR{"persist"};
+
+// A key for encoding the persistence data
+const string PERSIST_KEY{"elephant"};
+
+// Class to pace timing and signal and exit without delay.
+class quit_signal
+{
+    condition_variable cv_;
+    mutex mtx_;
+    bool quit_{false};
+
+public:
+    template <class Clock, class Duration>
+    bool wait_until(const time_point<Clock, Duration>& abs_time)
+    {
+        unique_lock lk(mtx_);
+        return cv_.wait_until(lk, abs_time, [this] { return quit_; });
+    }
+
+    void signal()
+    {
+        unique_lock<mutex> lk(mtx_);
+        quit_ = true;
+        lk.unlock();
+        cv_.notify_one();
+    }
+};
+
+// Variable to pace timing and signal exit
+quit_signal quit;
 
 /////////////////////////////////////////////////////////////////////////////
-
-// At some point, when the library gets updated to C++17, we can use
-// std::filesystem to make a portable version of this.
-
-#if !defined(_WIN32)
 
 // Example of user-based file persistence with a simple XOR encoding scheme.
 //
@@ -96,11 +121,10 @@ const string PERSIST_DIR{"data-persist"};
 // SQLite or a local key/value store like Redis.
 class encoded_file_persistence : virtual public mqtt::iclient_persistence
 {
-    // The name of the store
-    // Used as the directory name
-    string name_;
+    // The directory for the persistence store.
+    fs::path dir_;
 
-    // A key for encoding the data
+    // A key for encoding the data, as supplied by the user
     string encodeKey_;
 
     // Simple, in-place XOR encoding and decoding
@@ -114,7 +138,7 @@ class encoded_file_persistence : virtual public mqtt::iclient_persistence
     }
 
     // Gets the persistence file name for the supplied key.
-    string path_name(const string& key) const { return name_ + "/" + key; }
+    fs::path path_name(const string& key) const { return dir_ / key; }
 
 public:
     // Create the persistence object with the specified encoding key
@@ -132,33 +156,34 @@ public:
         if (clientId.empty() || serverURI.empty())
             throw mqtt::persistence_exception();
 
-        name_ = serverURI + "-" + clientId;
-        std::replace(name_.begin(), name_.end(), ':', '-');
+        // Create a name for the persistence subdirectory for this client
+        string name = serverURI + "-" + clientId;
+        std::replace(name.begin(), name.end(), ':', '-');
 
-        mkdir(name_.c_str(), S_IRWXU | S_IRWXG);
+        dir_ = PERSIST_DIR;
+        dir_ /= name;
+
+        fs::create_directories(dir_);
     }
 
     // Close the persistent store that was previously opened.
     // Remove the persistence directory, if it's empty.
-    void close() override { rmdir(name_.c_str()); }
+    void close() override
+    {
+        fs::remove(dir_);
+        fs::remove(dir_.parent_path());
+    }
 
     // Clears persistence, so that it no longer contains any persisted data.
     // Just remove all the files from the persistence directory.
     void clear() override
     {
-        DIR* dir = opendir(name_.c_str());
-        if (!dir)
-            return;
-
-        dirent* next;
-        while ((next = readdir(dir)) != nullptr) {
-            auto fname = string(next->d_name);
-            if (fname == "." || fname == "..")
-                continue;
-            string path = name_ + "/" + fname;
-            remove(path.c_str());
+        // We could iterate through and remove each file,
+        // but this does the same thing in fewer steps.
+        if (!fs::is_empty(dir_)) {
+            fs::remove_all(dir_);
+            fs::create_directories(dir_);
         }
-        closedir(dir);
     }
 
     // Returns whether or not data is persisted using the specified key.
@@ -166,18 +191,12 @@ public:
     // the key.
     bool contains_key(const string& key) override
     {
-        DIR* dir = opendir(name_.c_str());
-        if (!dir)
-            return false;
-
-        dirent* next;
-        while ((next = readdir(dir)) != nullptr) {
-            if (string(next->d_name) == key) {
-                closedir(dir);
-                return true;
+        if (fs::exists(dir_)) {
+            for (const auto& entry : fs::directory_iterator(dir_)) {
+                if (entry.path().filename() == key)
+                    return true;
             }
         }
-        closedir(dir);
         return false;
     }
 
@@ -186,19 +205,12 @@ public:
     mqtt::string_collection keys() const override
     {
         mqtt::string_collection ks;
-        DIR* dir = opendir(name_.c_str());
-        if (!dir)
-            return ks;
 
-        dirent* next;
-        while ((next = readdir(dir)) != nullptr) {
-            auto fname = string(next->d_name);
-            if (fname == "." || fname == "..")
-                continue;
-            ks.push_back(fname);
+        if (fs::exists(dir_)) {
+            for (const auto& entry : fs::directory_iterator(dir_)) {
+                ks.push_back(entry.path().filename().string());
+            }
         }
-
-        closedir(dir);
         return ks;
     }
 
@@ -255,27 +267,30 @@ public:
     void remove(const string& key) override
     {
         auto path = path_name(key);
-        ::remove(path.c_str());
+        fs::remove(path);
     }
 };
-#endif
 
 /////////////////////////////////////////////////////////////////////////////
 
+// Handler for ^C (SIGINT)
+void ctrlc_handler(int) { quit.signal(); }
+
+// --------------------------------------------------------------------------
+
 int main(int argc, char* argv[])
 {
-    string address = (argc > 1) ? string(argv[1]) : DFLT_ADDRESS;
+    string serverURI = (argc > 1) ? string{argv[1]} : DFLT_SERVER_URI;
 
-#if defined(_WIN32)
-    mqtt::async_client cli(address, CLIENT_ID, MAX_BUFFERED_MSGS);
-#else
-    encoded_file_persistence persist("elephant");
-    mqtt::async_client cli(address, CLIENT_ID, MAX_BUFFERED_MSGS, &persist);
-#endif
+    // Create a persistence object
+    encoded_file_persistence persist{PERSIST_KEY};
+
+    // Create a client to use the persistence.
+    mqtt::async_client cli(serverURI, CLIENT_ID, MAX_BUFFERED_MSGS, &persist);
 
     auto connOpts = mqtt::connect_options_builder()
                         .keep_alive_interval(MAX_BUFFERED_MSGS * PERIOD)
-                        .clean_session(true)
+                        .clean_session(false)
                         .automatic_reconnect(true)
                         .finalize();
 
@@ -290,20 +305,22 @@ int main(int argc, char* argv[])
 
     try {
         // Connect to the MQTT broker
-        cout << "Connecting to server '" << address << "'..." << flush;
+        cout << "Connecting to server '" << serverURI << "'..." << flush;
         cli.connect(connOpts)->wait();
         cout << "OK\n" << endl;
 
         char tmbuf[32];
         unsigned nsample = 0;
 
-        // The time at which to reads the next sample, starting now
-        auto tm = steady_clock::now();
+        // Install a ^C handler for user to signal when to exit
+        signal(SIGINT, ctrlc_handler);
 
-        while (true) {
-            // Pace the samples to the desired rate
-            this_thread::sleep_until(tm);
+        // The steady time at which to read the next sample
+        auto tm = steady_clock::now() + 250ms;
 
+        // Pace the sampling by letting the condition variable time out
+        // periodically. When 'quit' is signaled, it's time to quit.
+        while (!quit.wait_until(tm)) {
             // Get a timestamp and format as a string
             time_t t = system_clock::to_time_t(system_clock::now());
             strftime(tmbuf, sizeof(tmbuf), "%F %T", localtime(&t));

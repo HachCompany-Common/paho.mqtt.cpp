@@ -3,6 +3,15 @@
 /// Declaration of MQTT async_client class
 /// @date May 1, 2013
 /// @author Frank Pagliughi
+///
+/// @mainpage The Eclipse Paho MQTT Library for C++
+///
+/// @section Introduction
+///
+/// This is the Eclipse Paho MQTT Library for C++. It contains an MQTT
+/// client for memory-managed operating systems like Windows, macOS, Linux,
+/// and other *nix-style systems.
+///
 /////////////////////////////////////////////////////////////////////////////
 
 /*******************************************************************************
@@ -36,6 +45,7 @@
 #include "mqtt/callback.h"
 #include "mqtt/create_options.h"
 #include "mqtt/delivery_token.h"
+#include "mqtt/event.h"
 #include "mqtt/exception.h"
 #include "mqtt/iaction_listener.h"
 #include "mqtt/iasync_client.h"
@@ -84,9 +94,11 @@ const string COPYRIGHT("Copyright (c) 2013-2024 Frank Pagliughi");
  * "ssl://")
  * @li @em "ws://" - A standard (insecure) WebSocket connection.
  * @li @em "wss:// - A secure websocket connection using SSL/TLS.
+ * @li @em "unix://" - A UNIX-domain connection on the local machine. (*nix
+ * systems, only)
  *
  * The secure connection types assume that the library was built with
- * OpenSSL support, otherwise requesting a secure connection will result in
+ * SSL/TLS support, otherwise requesting a secure connection will result in
  * an error.
  *
  * The communication methods of this class - `connect()`, `publish()`,
@@ -110,8 +122,8 @@ class async_client : public virtual iasync_client
 public:
     /** Smart/shared pointer for an object of this class */
     using ptr_t = std::shared_ptr<async_client>;
-    /** Type for a thread-safe queue to consume messages synchronously */
-    using consumer_queue_type = std::unique_ptr<thread_queue<const_message_ptr>>;
+    /** Type for a thread-safe queue to consume events synchronously */
+    using consumer_queue_type = std::unique_ptr<thread_queue<event>>;
 
     /** Handler type for registering an individual message callback */
     using message_handler = std::function<void(const_message_ptr)>;
@@ -529,7 +541,8 @@ public:
      *  	   token will be passed to callback methods if set.
      */
     delivery_token_ptr publish(
-        string_ref topic, const void* payload, size_t n, int qos, bool retained
+        string_ref topic, const void* payload, size_t n, int qos, bool retained,
+		const properties &props=properties()
     ) override;
     /**
      * Publishes a message to a topic on the server
@@ -555,7 +568,9 @@ public:
      * @return token used to track and wait for the publish to complete. The
      *  	   token will be passed to callback methods if set.
      */
-    delivery_token_ptr publish(string_ref topic, binary_ref payload, int qos, bool retained)
+    delivery_token_ptr publish(string_ref topic, binary_ref payload, int qos, bool retained,
+							   const properties &props=properties()
+							   )
         override;
     /**
      * Publishes a message to a topic on the server
@@ -746,29 +761,177 @@ public:
     ) override;
     /**
      * Start consuming messages.
+     *
      * This initializes the client to receive messages through a queue that
      * can be read synchronously.
+     *
+     * Normally this should be called _before_ connecting the client to the
+     * broker, in order to have the consumer queue in place in the event
+     * that the immediately starts sending messages (such as any retained
+     * messages) while the client is still in the context of the connect
+     * call.
+     *
+     * This _must_ also be called before calling any 'consume_message' or
+     * "'consume_event' methods.
+     *
+     * Internally, this just creates a thread-safe queue for `mqtt::event`
+     * objects, then hooks into the message and state-change callback to
+     * push events into the queue in the order received.
      */
     void start_consuming() override;
     /**
      * Stop consuming messages.
-     * This shuts down the internal callback and discards any unread
-     * messages.
+     *
+     * This shuts down the internal callback and closes the internal
+     * consumer queue. Any remaining messages and events can be read until
+     * the queue is emptied, but nothing further will be added to it.
+     * This will also wake up any thread waiting on the queue.
      */
     void stop_consuming() override;
     /**
-     * Read the next message from the queue.
+     * This clears the consumer queue, discarding any pending event.
+     */
+    void clear_consumer() override {
+        if (que_) que_->clear();
+    }
+    /**
+     * Determines if the consumer queue has been closed.
+     * Once closed, any events in the queue can still be read, but no new
+     * events can be added to it.
+     * @return @true if the consumer queue has been closed, @false
+     *         otherwise.
+     */
+    bool consumer_closed() noexcept override {
+        return !que_ || que_->closed();
+    }
+    /**
+     * Determines if the consumer queue is "done" (closed and empty).
+     * Once the queue is done, no more events can be added or removed fom
+     * the queue.
+     * @return @true if the consumer queue is closed and empty, @false
+     *         otherwise.
+     */
+    bool consumer_done() noexcept override {
+        return !que_ || que_->done();
+    }
+    /**
+     * Gets the number of events available for immediate consumption.
+     * Note that this retrieves the number of "raw" events, not messages,
+     * e.g. may include a connected_event which is not returned by try_consume_message().
+     * When polling the queue from multiple threads, prefer using try_consume_event(),
+     * as the event count may change between checking the size and actual retrieval.
+     * @return the number of events in the queue.
+     */
+    std::size_t consumer_queue_size() const override {
+        return (que_) ? que_->size() : 0;
+    }
+    /**
+     * Read the next client event from the queue.
      * This blocks until a new message arrives.
+     * If the consumer queue is closed, this returns a shutdown event.
+     * @return The client event.
+     */
+    event consume_event() override;
+    /**
+     * Try to read the next client event without blocking.
+     * @param evt Pointer to the value to receive the event
+	 * @return @em true if an event was read, @em false if no
+	 *  	   event was available.
+     */
+    bool try_consume_event(event* evt) override;
+    /**
+     * Waits a limited time for a client event to appear.
+     * @param evt Pointer to the value to receive the event.
+     * @param relTime The maximum amount of time to wait for an event.
+     * @return @em true if an event was read, @em false if a timeout
+     *  	   occurred.
+     */
+    template <typename Rep, class Period>
+    bool try_consume_event_for(
+        event* evt, const std::chrono::duration<Rep, Period>& relTime
+    ) {
+        if (!que_)
+            throw mqtt::exception(-1, "Consumer not started");
+
+        try {
+            return que_->try_get_for(evt, relTime);
+        }
+        catch (queue_closed&) {
+            *evt = event{shutdown_event{}};
+            return true;
+        }
+    }
+    /**
+     * Waits a limited time for a client event to arrive.
+	 * @param relTime The maximum amount of time to wait for an event.
+	 * @return The event that was received. It will contain empty message on
+	 *  	   timeout.
+     */
+    template <typename Rep, class Period>
+    event try_consume_event_for(const std::chrono::duration<Rep, Period>& relTime) {
+        event evt;
+        try {
+            que_->try_get_for(&evt, relTime);
+        }
+        catch (queue_closed&) {
+            evt = event{shutdown_event{}};
+        }
+        return evt;
+    }
+    /**
+     * Waits until a specific time for a client event to appear.
+     * @param evt Pointer to the value to receive the event.
+     * @param absTime The time point to wait until, before timing out.
+	 * @return @em true if an event was recceived, @em false if a timeout
+	 *  	   occurred.
+     */
+    template <class Clock, class Duration>
+    bool try_consume_event_until(
+        event* evt, const std::chrono::time_point<Clock, Duration>& absTime
+    ) {
+        if (!que_)
+            throw mqtt::exception(-1, "Consumer not started");
+
+        try {
+            return que_->try_get_until(evt, absTime);
+        }
+        catch (queue_closed&) {
+            *evt = event{shutdown_event{}};
+            return true;
+        }
+    }
+    /**
+     * Waits until a specific time for a client event to appear.
+	 * @param absTime The time point to wait until, before timing out.
+	 * @return The event that was received. It will contain empty message on
+	 *  	   timeout.
+     */
+    template <class Clock, class Duration>
+    event try_consume_event_until(const std::chrono::time_point<Clock, Duration>& absTime
+    ) {
+        event evt;
+        try {
+            que_->try_get_until(&evt, absTime);
+        }
+        catch (queue_closed&) {
+            evt = event{shutdown_event{}};
+        }
+        return evt;
+    }
+    /**
+     * Read the next message from the queue.
+     * This blocks until a new message arrives or until a disconnect or
+     * shutdown occurs.
      * @return The message and topic.
      */
-    const_message_ptr consume_message() override { return que_->get(); }
+    const_message_ptr consume_message() override;
     /**
      * Try to read the next message from the queue without blocking.
      * @param msg Pointer to the value to receive the message
      * @return @em true is a message was read, @em false if no message was
      *  	   available.
      */
-    bool try_consume_message(const_message_ptr* msg) override { return que_->try_get(msg); }
+    bool try_consume_message(const_message_ptr* msg) override;
     /**
      * Waits a limited time for a message to arrive.
      * @param msg Pointer to the value to receive the message
@@ -780,7 +943,26 @@ public:
     bool try_consume_message_for(
         const_message_ptr* msg, const std::chrono::duration<Rep, Period>& relTime
     ) {
-        return que_->try_get_for(msg, relTime);
+        if (!que_)
+            throw mqtt::exception(-1, "Consumer not started");
+
+        event evt;
+
+		while (true) {
+			if (!try_consume_event_for(&evt, relTime))
+				return false;
+
+			if (const auto* pval = evt.get_message_if()) {
+				*msg = std::move(*pval);
+				break;
+			}
+
+			if (evt.is_any_disconnect()) {
+				*msg = const_message_ptr{};
+				break;
+			}
+		}
+        return true;
     }
     /**
      * Waits a limited time for a message to arrive.
@@ -793,7 +975,7 @@ public:
         const std::chrono::duration<Rep, Period>& relTime
     ) {
         const_message_ptr msg;
-        que_->try_get_for(&msg, relTime);
+        this->try_consume_message_for(&msg, relTime);
         return msg;
     }
     /**
@@ -807,7 +989,27 @@ public:
     bool try_consume_message_until(
         const_message_ptr* msg, const std::chrono::time_point<Clock, Duration>& absTime
     ) {
-        return que_->try_get_until(msg, absTime);
+        if (!que_)
+            throw mqtt::exception(-1, "Consumer not started");
+
+        event evt;
+
+		while (true) {
+			if (!try_consume_event_until(&evt, absTime))
+				return false;
+
+			if (const auto* pval = evt.get_message_if()) {
+				*msg = std::move(*pval);
+				break;
+			}
+
+			if (!evt.is_any_disconnect()) {
+				*msg = const_message_ptr{};
+				break;
+			}
+		}
+
+        return true;
     }
     /**
      * Waits until a specific time for a message to appear.
@@ -819,7 +1021,7 @@ public:
         const std::chrono::time_point<Clock, Duration>& absTime
     ) {
         const_message_ptr msg;
-        que_->try_get_until(&msg, absTime);
+        this->try_consume_message_until(&msg, absTime);
         return msg;
     }
 };
