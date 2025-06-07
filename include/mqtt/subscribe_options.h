@@ -66,11 +66,9 @@ public:
     static constexpr bool LOCAL = false;
 
     /** @deprecated Don't receive our own publications */
-    [[deprecated("Use NO_LOCAL")]]
-    static constexpr bool SUBSCRIBE_NO_LOCAL = true;
+    [[deprecated("Use NO_LOCAL")]] static constexpr bool SUBSCRIBE_NO_LOCAL = true;
     /** @deprecated Receive our own publications (obsolete name) */
-    [[deprecated("Use LOCAL")]]
-    static constexpr bool SUBSCRIBE_LOCAL = false;
+    [[deprecated("Use LOCAL")]] static constexpr bool SUBSCRIBE_LOCAL = false;
 
     /**
      * Retain flag is only set on publications sent by a broker if in

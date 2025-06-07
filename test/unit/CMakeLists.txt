@@ -58,9 +58,8 @@ if(PAHO_WITH_SSL)
     )
 endif()
 
-target_compile_features(unit_tests PRIVATE cxx_std_17)
-
 set_target_properties(unit_tests PROPERTIES
+    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )
@@ -72,8 +71,8 @@ endif()
 # --- Link for executables ---
 
 target_link_libraries(unit_tests
-    PahoMqttCpp::paho-mqttpp3
     Catch2::Catch2
+    PahoMqttCpp::paho-mqttpp3
 )
 
 if(PAHO_BUILD_SHARED)

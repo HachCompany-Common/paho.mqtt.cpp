@@ -208,7 +208,7 @@ public:
      */
     virtual delivery_token_ptr publish(
         string_ref topic, const void* payload, size_t n, int qos, bool retained,
-		const properties &props=properties()
+        const properties& props = properties()
     ) = 0;
     /**
      * Publishes a message to a topic on the server
@@ -251,7 +251,7 @@ public:
      */
     virtual delivery_token_ptr publish(
         string_ref topic, binary_ref payload, int qos, bool retained,
-		const properties &props=properties()
+        const properties& props = properties()
     ) = 0;
     /**
      * Publishes a message to a topic on the server.
@@ -462,19 +462,15 @@ public:
      * @return @true if the consumer queue has been closed, @false
      *         otherwise.
      */
-    virtual bool consumer_closed() noexcept {
-        return false;
-    }
+    virtual bool consumer_closed() noexcept { return false; }
     /**
      * Determines if the consumer queue is "done" (closed and empty).
-     * Once the queue is done, no more events can be added or removed fom
+     * Once the queue is done, no more events can be added or removed from
      * the queue.
      * @return @true if the consumer queue is closed and empty, @false
      *         otherwise.
      */
-    virtual bool consumer_done() noexcept {
-        return false;
-    }
+    virtual bool consumer_done() noexcept { return false; }
     /**
      * Gets the number of events available for immediate consumption.
      * Note that this retrieves the number of "raw" events, not messages,
@@ -502,14 +498,12 @@ public:
      * This blocks until a new message arrives.
      * @return The message and topic.
      */
-    virtual event consume_event() {
-        return event{};
-    }
+    virtual event consume_event() { return event{}; }
     /**
      * Try to read the next message from the queue without blocking.
      * @param evt Pointer to the value to receive the event
-	 * @return @em true is an event was received, @em false if no event was
-	 *  	   available.
+     * @return @em true is an event was received, @em false if no event was
+     *  	   available.
      */
     virtual bool try_consume_event(event* evt) {
         (void)evt;

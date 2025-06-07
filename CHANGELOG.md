@@ -6,6 +6,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Version 1.5.3](https://github.com/eclipse/paho.mqtt.cpp/compare/v1.5.2..v1.5.3) (2025-05-15)
+
+- Fix the bundled Paho C build foc C23 compilers by forcing C99 compliance in CMake build
+- [#544](https://github.com/eclipse-paho/paho.mqtt.cpp/pull/544) and [#550](https://github.com/eclipse-paho/paho.mqtt.cpp/pull/550) Use std::vector<unsigned char> for the ALPN protocol list in wire format
+- [#547](https://github.com/eclipse-paho/paho.mqtt.cpp/pull/547) Fixed up some of the v5 examples for proper connect options
+- [#549](https://github.com/eclipse-paho/paho.mqtt.cpp/pull/549) Update TEST_EXTERNAL_SERVER urls
+
+
+## [Version 1.5.2](https://github.com/eclipse/paho.mqtt.cpp/compare/v1.5.1..v1.5.2) (2025-03-11)
+
+- Fixed the Version number and string.
+- Synchronous `Client` constructors updated to use `persistence_type` and (just) `create_options`
+    - Restored compatibility with `async_client`
+- [#505](https://github.com/eclipse-paho/paho.mqtt.cpp/issues/505): Example of retrieving MQTT v5 properties in message received callback
+- [#537](https://github.com/eclipse-paho/paho.mqtt.cpp/issues/537) Fixed the Windows DLL build by exporting message::EMPTY_STR and message::EMPTY_BIN
+- [#540](https://github.com/eclipse-paho/paho.mqtt.cpp/issues/537) Missing default argument in `async_client` changed constructor breaks code compatibility
+
+
+## [Version 1.5.1](https://github.com/eclipse/paho.mqtt.cpp/compare/v1.5.0..v1.5.1) - (2025-02-09)
+
+- Minor fixes to README and docs
+- [#532](https://github.com/eclipse-paho/paho.mqtt.cpp/pull/532) Fix CMake install target lib path
+- [#534](https://github.com/eclipse-paho/paho.mqtt.cpp/issues/534) Fixed seg fault with clang in get_topic() when publishing a message
+- [#535](https://github.com/eclipse-paho/paho.mqtt.cpp/issues/535) Fixed last few files that were not properly licenced for EPL v2.0
+
 
 ## [Version 1.5.0](https://github.com/eclipse/paho.mqtt.cpp/compare/v1.4.1..v1.5.0) - (2025-01-07)
 

@@ -6,9 +6,10 @@
 // interface, employing callbacks to receive messages and status updates.
 //
 // The sample demonstrates:
-//  - Connecting to an MQTT server/broker using MQTT v3.
+//  - Connecting to an MQTT server/broker using MQTT v5.
 //  - Subscribing to a topic
 //  - Receiving messages through the callback API
+//  - Displaying MQTT v5 message properties.
 //  - Receiving network disconnect updates and attempting manual reconnects.
 //  - Using a "clean session" and manually re-subscribing to topics on
 //    reconnect.
@@ -42,7 +43,6 @@
 
 const std::string DFLT_SERVER_URI("mqtt://localhost:1883");
 const std::string CLIENT_ID("paho_cpp_async_subscribe");
-
 const std::string TOPIC("#");
 
 const int QOS = 1;
@@ -160,9 +160,16 @@ class callback : public virtual mqtt::callback, public virtual mqtt::iaction_lis
     // Callback for when a message arrives.
     void message_arrived(mqtt::const_message_ptr msg) override
     {
-        std::cout << "Message arrived" << std::endl;
+        std::cout << "\nMessage arrived" << std::endl;
         std::cout << "\ttopic: '" << msg->get_topic() << "'" << std::endl;
-        std::cout << "\tpayload: '" << msg->to_string() << "'\n" << std::endl;
+        std::cout << "\tpayload: '" << msg->to_string() << std::endl;
+
+        const mqtt::properties& props = msg->get_properties();
+        if (size_t n = props.size(); n != 0) {
+            std::cout << "\tproperties (" << n << "):\n\t  [";
+            for (size_t i = 0; i < n - 1; ++i) std::cout << props[i] << ", ";
+            std::cout << props[n - 1] << "]" << std::endl;
+        }
     }
 
     void delivery_complete(mqtt::delivery_token_ptr token) override {}
@@ -186,8 +193,7 @@ int main(int argc, char* argv[])
 
     mqtt::async_client cli(serverURI, CLIENT_ID);
 
-    mqtt::connect_options connOpts;
-    connOpts.set_clean_session(false);
+    auto connOpts = mqtt::connect_options_builder::v5().clean_start(true).finalize();
 
     // Install the callback(s) before connecting.
     callback cb(cli, connOpts);

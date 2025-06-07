@@ -46,7 +46,8 @@ using namespace std::chrono;
 
 const string DFLT_SERVER_URI{"mqtt://localhost:1883"};
 const string CLIENT_ID{"paho_cpp_async_publish"};
-const string PERSIST_DIR{"./persist"};
+
+const mqtt::persistence_type PERSIST_DIR{"./persist"};
 
 const string TOPIC{"hello"};
 

@@ -21,7 +21,15 @@
 #include <cstring>
 #include <utility>
 
+#include "mqtt/export.h"
+
 namespace mqtt {
+
+// A const string to use for references
+PAHO_MQTTPP_EXPORT const string message::EMPTY_STR;
+
+// A const binary to use for references
+PAHO_MQTTPP_EXPORT const binary message::EMPTY_BIN;
 
 /////////////////////////////////////////////////////////////////////////////
 

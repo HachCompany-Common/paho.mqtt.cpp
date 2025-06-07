@@ -24,7 +24,7 @@
 
 cmake_minimum_required(VERSION 3.13)
 
-project(PahoMqttCpp VERSION "1.5.0")
+project(PahoMqttCpp VERSION "1.5.3")
 
 ## --- Build options ---
 
@@ -49,6 +49,10 @@ if(NOT PAHO_BUILD_SHARED AND NOT PAHO_BUILD_STATIC)
     message(FATAL_ERROR "You must set either PAHO_BUILD_SHARED, PAHO_BUILD_STATIC, or both")
 endif()
 
+# --- Setting naming variables ---
+
+set(PAHO_MQTTPP_GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
+
 ## --- Find Paho C or build it, if reqested ---
 
 if(PAHO_WITH_SSL)
@@ -67,6 +71,7 @@ if(PAHO_WITH_MQTT_C)
     if(NOT WIN32)
         set(PAHO_WITH_UNIX_SOCKETS TRUE CACHE BOOL "Support for Unix-domain sockets")
     endif()
+    set(CMAKE_C_STANDARD 99 CACHE STRING "Paho C language standard")
 
     add_subdirectory(${PROJECT_SOURCE_DIR}/externals/paho-mqtt-c)
 
@@ -136,6 +141,15 @@ if(PAHO_BUILD_TESTS)
     enable_testing()
     add_subdirectory(test/unit)
 endif()
+
+## --- Install generated header(s) ---
+
+install(
+    DIRECTORY
+        ${PAHO_MQTTPP_GENERATED_DIR}/include/
+    DESTINATION
+        ${CMAKE_INSTALL_INCLUDEDIR}
+)
 
 ## --- Packaging settings ---
 

@@ -9,7 +9,7 @@
 //  - Connecting to an MQTT server/broker
 //  - Subscribing to multiple topics
 //  - Receiving messages through the queueing consumer API
-//  - Recieving and acting upon commands via MQTT topics
+//  - Receiving and acting upon commands via MQTT topics
 //  - Manual reconnects
 //  - Using a persistent (non-clean) session
 //
@@ -90,10 +90,9 @@ double mult(const std::vector<double>& nums)
 
 int main(int argc, char* argv[])
 {
-    mqtt::create_options createOpts(MQTTVERSION_5);
-    mqtt::client cli(SERVER_ADDRESS, CLIENT_ID, createOpts);
+    mqtt::client cli(SERVER_ADDRESS, CLIENT_ID);
 
-    auto connOpts = mqtt::connect_options_builder()
+    auto connOpts = mqtt::connect_options_builder::v5()
                         .keep_alive_interval(seconds(20))
                         .clean_start()
                         .finalize();

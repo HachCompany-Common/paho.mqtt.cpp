@@ -116,9 +116,7 @@ private:
     using unique_guard = std::unique_lock<std::mutex>;
 
     /** Checks if the queue is done (unsafe) */
-    bool is_done() const {
-        return closed_ && que_.empty();
-    }
+    bool is_done() const { return closed_ && que_.empty(); }
 
 public:
     /**
@@ -207,8 +205,7 @@ public:
      */
     void clear() {
         guard g{lock_};
-        while (!que_.empty())
-            que_.pop();
+        while (!que_.empty()) que_.pop();
         notFullCond_.notify_all();
     }
     /**
@@ -220,7 +217,8 @@ public:
     void put(value_type val) {
         unique_guard g{lock_};
         notFullCond_.wait(g, [this] { return que_.size() < cap_ || closed_; });
-        if (closed_) throw queue_closed{};
+        if (closed_)
+            throw queue_closed{};
 
         que_.emplace(std::move(val));
         notEmptyCond_.notify_one();
@@ -252,10 +250,9 @@ public:
     template <typename Rep, class Period>
     bool try_put_for(value_type val, const std::chrono::duration<Rep, Period>& relTime) {
         unique_guard g{lock_};
-        bool to = !notFullCond_.wait_for(
-			g, relTime,
-			[this] { return que_.size() < cap_ || closed_; }
-	    );
+        bool to = !notFullCond_.wait_for(g, relTime, [this] {
+            return que_.size() < cap_ || closed_;
+        });
         if (to || closed_)
             return false;
 
@@ -278,10 +275,9 @@ public:
         value_type val, const std::chrono::time_point<Clock, Duration>& absTime
     ) {
         unique_guard g{lock_};
-        bool to = !notFullCond_.wait_until(
-			g, absTime,
-			[this] { return que_.size() < cap_ || closed_; }
-	    );
+        bool to = !notFullCond_.wait_until(g, absTime, [this] {
+            return que_.size() < cap_ || closed_;
+        });
 
         if (to || closed_)
             return false;
@@ -364,10 +360,7 @@ public:
             return false;
 
         unique_guard g{lock_};
-        notEmptyCond_.wait_for(
-			g, relTime,
-			[this] { return !que_.empty() || closed_; }
-	    );
+        notEmptyCond_.wait_for(g, relTime, [this] { return !que_.empty() || closed_; });
 
         if (que_.empty())
             return false;
@@ -395,9 +388,7 @@ public:
             return false;
 
         unique_guard g{lock_};
-        notEmptyCond_.wait_until(
-			g, absTime, [this] { return !que_.empty() || closed_; }
-	    );
+        notEmptyCond_.wait_until(g, absTime, [this] { return !que_.empty() || closed_; });
         if (que_.empty())
             return false;
 

@@ -43,7 +43,6 @@ using namespace std;
 const string DFLT_SERVER_URI{"mqtt://localhost:1883"};
 const string CLIENT_ID{"PahoCppAsyncConsumeV5"};
 
-// const string TOPIC{"hello"};
 const string TOPIC{"#"};
 const int QOS = 1;
 
@@ -118,8 +117,7 @@ int main(int argc, char* argv[])
                     cout << msg->get_topic() << ": " << msg->to_string();
 
                     const auto& props = msg->get_properties();
-                    size_t n = props.size();
-                    if (n != 0) {
+                    if (size_t n = props.size(); n != 0) {
                         cout << "\n  [";
                         for (size_t i = 0; i < n - 1; ++i) cout << props[i] << ", ";
                         cout << props[n - 1] << "]";

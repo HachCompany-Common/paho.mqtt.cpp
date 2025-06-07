@@ -9,6 +9,7 @@ The library has the following features:
 - Support for MQTT v3.1, v3.1.1, and v5.
 - Network Transports:
     - Standard TCP
+    - UNIX-domain sockets
     - Secure sockets with SSL/TLS
     - WebSockets
         - Secure and insecure
@@ -21,34 +22,38 @@ The library has the following features:
 - Offline Buffering
 - High Availability
 - Blocking and non-blocking APIs
-- Modern C++ interface (C++11 and beyond)
+- Modern C++ interface (C++17)
 
-This code requires the [Paho C library](https://github.com/eclipse/paho.mqtt.c) by Ian Craggs, et al., specifically version 1.3.13 or possibly later.
+This code requires the [Paho C library](https://github.com/eclipse/paho.mqtt.c) by Ian Craggs, et al., specifically version 1.3.14 or possibly later.
 
 ## Latest News
 
 To keep up with the latest announcements for this project, or to ask questions:
 
-**Twitter:** [@eclipsepaho](https://twitter.com/eclipsepaho) and [@fmpagliughi](https://twitter.com/fmpagliughi)
-
 **Email:** [Eclipse Paho Mailing List](https://accounts.eclipse.org/mailing-list/paho-dev)
 
-### What's New in v1.5.0
+### What's New in v1.5.x
 
-The latest update moves the codebase to C++17 and adds supoort for UNIX-domain sockets. The update also fixes a number of build issues, and targets the latest Paho C release, v1.3.14.
+The latest updates for v1.5 moved the codebase to C++17 and added support for UNIX-domain sockets. They also fixed a number of build issues, now targeting the latest Paho C release, v1.3.14.
 
-- Update the code base to C++17
-- Support for the pending Paho C v1.3.14 release.
-- Support for UNIX-domain sockets
+The primary changes in the v1.5 versions are:
+
+- Updated the code base to C++17
+- Support for the Paho C v1.3.14 release.
+    - Support for UNIX-domain sockets
 - Reorganize and reformat the sources and added a .clang-format capability.
 - Create universal client instances that can connect using v3 or v5. (i.e. no more instances that are only v3 capable)
-- Bump the CMake to v3.12
-- Fix a number of CMake build issues
-- Update the GitHub CI
+- Bump the CMake to v3.13
+- Fix a large number of CMake build issues
+- Updated the GitHub CI
+- (v1.5.3) Fixes for building this library and the Paho C library with the latest C & C++ compilers, like Clang 20 and GCC 15 which created some breaking hcanges for legacy code.
+
+
+For the full list of updates in each release, see the [CHANGELOG](https://github.com/eclipse-paho/paho.mqtt.cpp/blob/master/CHANGELOG.md).
 
 ## Contributing
 
-Contributions to this project are gladly welcomed and appreciated Before submitting a Pull Request, please keep three things in mind:
+Contributions to this project are gladly welcomed and appreciated. Before submitting a Pull Request, please keep three things in mind:
 
  - This is an official Eclipse project, so it is required that all contributors sign an [Eclipse Contributor Agreement (ECA)](https://www.eclipse.org/legal/ECA.php)
  - Please submit all Pull Requests against the _develop_ branch (not master).
@@ -58,9 +63,19 @@ Contributions to this project are gladly welcomed and appreciated Before submitt
 
 ## Building from source
 
-_CMake_  is a cross-platform build system suitable for Unix and non-Unix platforms such as Microsoft Windows. It is now the only supported build system.
+As of v1.5, the Paho C++ library uses C++17 features, thus requiring a fully compliant C++17 compiler. Some of the more common compilers that can be used, depending on the target platform, are:
 
-The Paho C++ library requires the Paho C library, v1.3.13 or greater, to be built and installed. That can be done before building this library, or it can be done here using the CMake `PAHO_WITH_MQTT_C` build option.
+* GCC v8 or later
+* _clang_ v5 or later
+* Visual Studio 2017 15.8 (MSVC 19.15) or later
+
+_CMake_  is a cross-platform build system suitable for Unix and non-Unix platforms such as Microsoft Windows. It is the only supported build system. The current supported minimum version is:
+
+* cmake v3.13
+
+The Paho C++ library requires the Paho C library, v1.3.14 or greater to be built and installed. That can be done before building this library, or it can be done here using the CMake `PAHO_WITH_MQTT_C` build option to build both libraries at the same time. This also guarantees that a proper version of the C library is used, and that it is build with compatible options.
+
+### Build Options
 
 CMake allows for options to direct the build. The following are specific to Paho C++:
 
@@ -75,17 +90,19 @@ PAHO_BUILD_TESTS | FALSE | Build the unit tests. (Requires _Catch2_)
 PAHO_BUILD_DEB_PACKAGE | FALSE | Flag that configures cpack to build a Debian/Ubuntu package
 PAHO_WITH_MQTT_C | FALSE | Whether to build the bundled Paho C library
 
-In addition, the C++ build might commonly use `CMAKE_PREFIX_PATH` to help the build system find the location of the Paho C library.
+Enabling `PAHO_WITH_MQTT_C` builds and links in the Paho C library using compatible build options. If this is enabled, it passes the `PAHO_WITH_SSL` option to the C library, and also sets the options `PAHO_HIGH_PERFORMANCE` and `PAHO_WITH_UNIX_SOCKETS` for the C lib. These can be disabled in the cache before building if desired.
+
+In addition, the C++ build might commonly use `CMAKE_PREFIX_PATH` to help the build system find the location of the Paho C library if it was built separately.
 
 ### Build the Paho C++ and Paho C libraries together
 
-The quickest and easiest way to build Paho C++ is to buid it together with Paho C in a single step using the included Git submodule.
+The quickest and easiest way to build Paho C++ is to build it together with Paho C in a single step using the included Git submodule.
 This requires the CMake option `PAHO_WITH_MQTT_C` set.
 
 ```
 $ git clone https://github.com/eclipse/paho.mqtt.cpp
 $ cd paho.mqtt.cpp
-$ git co v1.5.0
+$ git co v1.5.3
 
 $ git submodule init
 $ git submodule update
@@ -96,14 +113,16 @@ $ sudo cmake --build build/ --target install
 
 This assumes the build tools and dependencies, such as OpenSSL, have already been installed. For more details and platform-specific requirements, see below.
 
-### Unix and Linux
+### Unix-style Systems (Linux, macOS, etc)
 
 On *nix systems CMake creates Makefiles.
 
 The build process currently supports a number of Unix and Linux flavors. The build process requires the following tools:
 
-  * CMake v3.12 or newer
-  * A fully-compatible C++17 compiler (GCC, Clang, etc)
+* CMake v3.13 or newer
+* A fully-compatible C++17 compiler. Common options are:
+    * GCC v8 or later
+    * _clang_ v5 or later
 
 On Debian based systems this would mean that the following packages have to be installed:
 
@@ -129,18 +148,16 @@ _Catch2_ can be found here: [Catch2](https://github.com/catchorg/Catch2).  You m
 
 #### Building the Paho C library
 
-The Paho C library can be built automatically when building this library by enabling the CMake build option, `PAHO_WITH_MQTT_C`. That will build and install the Paho C library from a Git submodule, using a known-good version, and the proper build configuration for the C++ library. But iIf you want to manually specify the build configuration of the Paho C library or use a different version, then it must be built and installed before building the C++ library. Note, this version of the C++ library requires Paho C v1.3.13 or greater.
+The Paho C library can be built automatically when building this library by enabling the CMake build option, `PAHO_WITH_MQTT_C`. That will build and install the Paho C library from a Git submodule, using a known-good version, and the proper build configuration for the C++ library. But iIf you want to manually specify the build configuration of the Paho C library or use a different version, then it must be built and installed before building the C++ library. Note, this version of the C++ library requires Paho C v1.3.14 or greater.
 
 To download and build the Paho C library:
 
-```
-$ git clone https://github.com/eclipse/paho.mqtt.c.git
-$ cd paho.mqtt.c
-$ git checkout v1.3.13
+    $ git clone https://github.com/eclipse/paho.mqtt.c.git
+    $ cd paho.mqtt.c
+    $ git checkout v1.3.14
 
-$ cmake -Bbuild -H. -DPAHO_ENABLE_TESTING=OFF -DPAHO_WITH_SSL=ON -DPAHO_HIGH_PERFORMANCE=ON
-$ sudo cmake --build build/ --target install
-```
+    $ cmake -Bbuild -H. -DPAHO_ENABLE_TESTING=OFF -DPAHO_WITH_SSL=ON -DPAHO_HIGH_PERFORMANCE=ON
+    $ sudo cmake --build build/ --target install
 
 This builds the C library with SSL/TLS enabled. If that is not desired, omit the `-DPAHO_WITH_SSL=ON`.
 
@@ -148,40 +165,30 @@ It also uses the "high performance" option of the C library to disable more exte
 
 The above will install the library to the default location on the host, which for Linux is normally `/usr/local`. To install the library to a non-standard location, use the `CMAKE_INSTALL_PREFIX` to specify a location. For example, to install into a directory under the user's home directory, perhaps for local testing, do this:
 
-```
-$ cmake -Bbuild -H. -DPAHO_ENABLE_TESTING=OFF \
-    -DPAHO_WITH_SSL=ON -DPAHO_HIGH_PERFORMANCE=ON \
-    -DCMAKE_INSTALL_PREFIX=$HOME/install
-```
+    $ cmake -Bbuild -H. -DPAHO_ENABLE_TESTING=OFF \
+        -DPAHO_WITH_SSL=ON -DPAHO_HIGH_PERFORMANCE=ON \
+        -DCMAKE_INSTALL_PREFIX=$HOME/install
 
 #### Building the Paho C++ library
 
 If the Paho C library is not already installed, the recommended version can be built along with the C++ library in a single step using the CMake option `PAHO_WITH_MQTT_C` set on.
 
-```
-$ git clone https://github.com/eclipse/paho.mqtt.cpp
-$ cd paho.mqtt.cpp
-$ git co v1.5.0
-$ git submodule init
-$ git submodule update
+    $ git clone https://github.com/eclipse/paho.mqtt.cpp
+    $ cd paho.mqtt.cpp
+    $ git co v1.5.3
+    $ git submodule init
+    $ git submodule update
 
-$ cmake -Bbuild -H. -DPAHO_WITH_MQTT_C=ON -DPAHO_BUILD_EXAMPLES=ON
-$ sudo cmake --build build/ --target install
-```
+    $ cmake -Bbuild -H. -DPAHO_WITH_MQTT_C=ON -DPAHO_BUILD_EXAMPLES=ON
+    $ sudo cmake --build build/ --target install
 
 If a recent version of the Paho C library is available on the build host, and it's installed to a default location, it does not need to be built again. Omit the `PAHO_WITH_MQTT_C` option:
 
-```
-$ cmake -Bbuild -H. -DPAHO_BUILD_SAMPLES=ON
-```
+    $ cmake -Bbuild -H. -DPAHO_BUILD_SAMPLES=ON
 
 If the Paho C library is installed to a _non-default_ location, or you want to build against a different version, use the `CMAKE_PREFIX_PATH` to specify its install location. Perhaps something like this:
 
-```
-$ cmake -Bbuild -H. -DPAHO_BUILD_SAMPLES=ON \
-    -DCMAKE_PREFIX_PATH=$HOME/install
-```
-
+    $ cmake -Bbuild -H. -DPAHO_BUILD_SAMPLES=ON -DCMAKE_PREFIX_PATH=$HOME/install
 
 #### Building a Debian/Ubuntu package
 
@@ -210,7 +217,7 @@ It's better not to mix DLLs and static libraries, but if you do link the Paho C+
 #### Building the Library on Windows
 
 The build process currently supports a number Windows versions. The build process requires the following tools:
-  * CMake GUI v3.12 or newer
+  * CMake GUI v3.13 or newer
   * Visual Studio 2019 or newer
 
 The libraries can be completely built at an MSBuild Command Prompt. Download the Paho C and C++ library sources, then open a command window and first compile the Paho C library:
@@ -238,7 +245,7 @@ The 64-bit target can be selected using the CMake generator switch, *-G*, at con
 
 ## Supported Network Protocols
 
-The library supports connecting to an MQTT server/broker using TCP, SSL/TLS, and websockets (secure and insecure). This is chosen by the URI supplied to the connect() call. It can be specified as:
+The library supports connecting to an MQTT server/broker using TCP, SSL/TLS, and websockets both (secure and insecure). On *nix targets, UNIX-domain sockets are also supported. The underlying transport is chosen by the URI supplied to indicate the remote host. It can be specified as:
 
     "mqtt://<host>:<port>"   - TCP, unsecure
      "tcp://<host>:<port>"    (same)
@@ -280,12 +287,13 @@ Some things to keep in mind when using the library in a multi-threaded applicati
         - For MQTT v5 consider using Subscription Identifiers to map incoming messages to callbacks or queues.
 - The various data and options structs (like connect_options) are simple data structs. They are not thread protected.
 
-## Example
+## Examples
 
-Sample applications can be found in the source repository at _src/samples_:
-https://github.com/eclipse/paho.mqtt.cpp/tree/master/src/samples
+Sample applications can be found in the source repository at [examples/](https://github.com/eclipse/paho.mqtt.cpp/tree/master/examples).
 
-This is a partial example of what a typical example might look like:
+These can all be build along with the library by specifying the CMake flag: `-DPAHO_BUILD_EXAMPLES=ON` when configuring the build.
+
+This is a partial example of what a typical application might look like:
 
 ```cpp
 int main(int argc, char* argv[])

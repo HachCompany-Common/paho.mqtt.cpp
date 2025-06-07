@@ -24,11 +24,12 @@
 #ifndef __mqtt_event_h
 #define __mqtt_event_h
 
+#include <variant>
+
 #include "mqtt/message.h"
 #include "mqtt/properties.h"
 #include "mqtt/reason_code.h"
 #include "mqtt/types.h"
-#include <variant>
 
 namespace mqtt {
 
@@ -54,8 +55,9 @@ struct disconnected_event
 };
 
 /** Event for when the consumer queue is shutdown from another thread */
-struct shutdown_event { };
-
+struct shutdown_event
+{
+};
 
 /* Event for when a message arrives is just a message pointer */
 
@@ -86,7 +88,8 @@ class event
 public:
     /** The variant type for any possible event. */
     using event_type = std::variant<
-        const_message_ptr, connected_event, connection_lost_event, disconnected_event, shutdown_event>;
+        const_message_ptr, connected_event, connection_lost_event, disconnected_event,
+        shutdown_event>;
 
 private:
     event_type evt_{};
@@ -176,17 +179,13 @@ public:
      * @return @em true if this event is an incoming message, @em false
      *         otherwise.
      */
-    bool is_message() const {
-        return std::holds_alternative<const_message_ptr>(evt_);
-    }
+    bool is_message() const { return std::holds_alternative<const_message_ptr>(evt_); }
     /**
      * Determines if this event is a client (re)connection.
      * @return @em true if this event is a client connection, @em false
      *         otherwise.
      */
-    bool is_connected() const {
-        return std::holds_alternative<connected_event>(evt_);
-    }
+    bool is_connected() const { return std::holds_alternative<connected_event>(evt_); }
     /**
      * Determines if this event is a client connection lost.
      * @return @em true if this event is a client connection lost, @em false
@@ -200,35 +199,29 @@ public:
      * @return @em true if this event is a client disconnected, @em false
      *         otherwise.
      */
-    bool is_disconnected() const {
-        return std::holds_alternative<disconnected_event>(evt_);
-    }
+    bool is_disconnected() const { return std::holds_alternative<disconnected_event>(evt_); }
     /**
      * Determines if this event is an internal shutdown request.
      * @return @em true if this event is a shutdown request, @em false
      *         otherwise.
      */
-    bool is_shutdown() const {
-        return std::holds_alternative<disconnected_event>(evt_);
-    }
+    bool is_shutdown() const { return std::holds_alternative<disconnected_event>(evt_); }
     /**
      * Determines if this is any type of client disconnect or shutdown.
      * @return @em true if this event is any type of client disconnect such
      *         as a 'connection lost', 'disconnected', or shutdown event.
      */
     bool is_any_disconnect() const {
-        return std::holds_alternative<connection_lost_event>(evt_)
-            || std::holds_alternative<disconnected_event>(evt_)
-            || std::holds_alternative<shutdown_event>(evt_);
+        return std::holds_alternative<connection_lost_event>(evt_) ||
+               std::holds_alternative<disconnected_event>(evt_) ||
+               std::holds_alternative<shutdown_event>(evt_);
     }
     /**
      * Gets the message from the event, iff this is a message event.
      * @return A message pointer, if this is a message event.
      * @throw std::bad_variant_access if this is not a 'message' event.
      */
-    const_message_ptr get_message() {
-        return std::get<const_message_ptr>(evt_);
-    }
+    const_message_ptr get_message() { return std::get<const_message_ptr>(evt_); }
     /**
      * Gets the underlying information for a disconnected event iff this is
      * a 'disconnected' event.
@@ -238,17 +231,14 @@ public:
      *         why the server disconnected.
      * @throw std::bad_variant_access if this is not a 'disconnected' event.
      */
-    disconnected_event get_disconnected() {
-        return std::get<disconnected_event>(evt_);
-    }
+    disconnected_event get_disconnected() { return std::get<disconnected_event>(evt_); }
     /**
      * Gets a pointer to the message in the event, iff this is a message
      * event.
      * @return A pointer to a message pointer, if this is a message event.
      *         Returns nulltr if this is not a message event.
      */
-    constexpr std::add_pointer_t<const_message_ptr>
-    get_message_if() noexcept {
+    constexpr std::add_pointer_t<const_message_ptr> get_message_if() noexcept {
         return std::get_if<const_message_ptr>(&evt_);
     }
     /**
@@ -260,8 +250,7 @@ public:
      *         why the server disconnected.
      * @throw std::bad_variant_access if this is not a 'disconnected' event.
      */
-    constexpr std::add_pointer_t<disconnected_event>
-    get_disconnected_if() noexcept {
+    constexpr std::add_pointer_t<disconnected_event> get_disconnected_if() noexcept {
         return std::get_if<disconnected_event>(&evt_);
     }
 };

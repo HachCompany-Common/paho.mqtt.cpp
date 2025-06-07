@@ -28,6 +28,8 @@
 set (THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
+include(GenerateExportHeader)
+
 ## --- Use object library to optimize compilation ---
 
 set(COMMON_SRC
@@ -77,6 +79,11 @@ if(PAHO_BUILD_SHARED)
         VERSION ${PROJECT_VERSION}
         SOVERSION ${PROJECT_VERSION_MAJOR}
     )
+
+    generate_export_header(paho-mqttpp3-shared
+        BASE_NAME paho_mqttpp
+        EXPORT_FILE_NAME ${PAHO_MQTTPP_GENERATED_DIR}/include/mqtt/export.h
+    )
 endif()
 
 ## --- Build static version of the library, if requested ---
@@ -99,9 +106,15 @@ if(PAHO_BUILD_STATIC)
     if(${PAHO_BUILD_SHARED})
         # This lib should configure for static exports
         target_compile_definitions(paho-mqttpp3-static PRIVATE PAHO_MQTTPP_STATIC)
+        target_compile_definitions(paho-mqttpp3-static PRIVATE PAHO_MQTTPP_STATIC_DEFINE)
     else()
         # If no shared lib, make this one the default target
         add_library(PahoMqttCpp::paho-mqttpp3 ALIAS paho-mqttpp3-static)
+
+        generate_export_header(paho-mqttpp3-static
+            BASE_NAME paho_mqttpp
+            EXPORT_FILE_NAME ${PAHO_MQTTPP_GENERATED_DIR}/include/mqtt/export.h
+        )
     endif()
 
     ## Let the archive use the same base name as the shared lib on *nix systems
@@ -110,14 +123,19 @@ if(PAHO_BUILD_STATIC)
     endif()
 endif()
 
+## --- Make sure at least one target was specified ---
+
+if(NOT PAHO_CPP_TARGETS)
+    message(FATAL_ERROR "No build targets are specified")
+endif()
+
 ## --- Set common properties, etc ---
 
 include(GNUInstallDirs)
 
 foreach(TARGET ${PAHO_CPP_TARGETS})
-    target_compile_features(${TARGET} PRIVATE cxx_std_17)
-
     set_target_properties(${TARGET} PROPERTIES
+        CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF
     )

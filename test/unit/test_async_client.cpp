@@ -36,7 +36,8 @@ using namespace mqtt;
 // NOTE: This test case requires network access. It uses one of
 //  	 the public available MQTT brokers
 #if defined(TEST_EXTERNAL_SERVER)
-static const std::string GOOD_SERVER_URI{"tcp://mqtt.eclipse.org:1883"};
+static const std::string GOOD_SERVER_URI{"tcp://mqtt.eclipseprojects.io:1883"};
+static const std::string GOOD_SSL_SERVER_URI{"ssl://mqtt.eclipseprojects.io:1885"};
 #else
 static const std::string GOOD_SERVER_URI{"tcp://localhost:1883"};
 static const std::string GOOD_SSL_SERVER_URI{"ssl://localhost:18885"};
@@ -44,8 +45,9 @@ static const std::string GOOD_SSL_SERVER_URI{"ssl://localhost:18885"};
 
 static const std::string BAD_SERVER_URI{"one://invalid.address"};
 static const std::string CLIENT_ID{"test_async_client"};
-static const std::string PERSISTENCE_DIR{"persist"};
 static const std::string TOPIC{"topic"};
+
+static const persistence_type PERSISTENCE_DIR{"persist"};
 
 static const int GOOD_QOS{0};
 static const int BAD_QOS{3};

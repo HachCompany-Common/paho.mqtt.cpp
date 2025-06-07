@@ -6,7 +6,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 /*******************************************************************************
- * Copyright (c) 2020-2024 Frank Pagliughi <fpagliughi@mindspring.com>
+ * Copyright (c) 2020-2025 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v2.0
@@ -44,17 +44,34 @@ constexpr no_persistence NO_PERSISTENCE{};
 
 /**
  * A variant for the different type of persistence:
- * @li no_persistence: Any object of this type indicates no persistence.
- * @li string: Indicates file persistence. The string specifies the
+ * @li @em no_persistence: Any object of this type indicates no persistence
+ *     is desired.
+ * @li @em string: Indicates file persistence. The string specifies the
  *     directory for the persistence store.
- * @li iclient_persistence*: User-defined persistence
+ * @li @em iclient_persistence*: User-defined persistence
  */
 using persistence_type = std::variant<no_persistence, string, iclient_persistence*>;
 
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * Options for creating a client object.
+ * The set of options for constructing a client object.
+ *
+ * Note that the numerous, incomplete set of constructors pre-date the
+ * current, expanded, options structure. For a full set of create options, a
+ * builder can be used to specify the options, then construct the client
+ * with those options, like this:
+ *
+ * @code
+ *     auto createOpts = mqtt::create_options_builder()
+ *                        .server_uri(serverURI)
+ *                        .send_while_disconnected()
+ *                        .max_buffered_messages(25)
+ *                        .delete_oldest_messages()
+ *                        .finalize();
+ *
+ *     mqtt::async_client cli(createOpts);
+ * @endcode
  */
 class create_options
 {
@@ -98,18 +115,6 @@ public:
      *  						  be buffered while not connected
      */
     create_options(int mqttVersion, int maxBufferedMessages);
-
-    /**
-     * Cretae options for the specified server and client ID.
-     * This uses file-based persistence in the specified directory.
-     * @param serverURI the address of the server to connect to, specified
-     *  				as a URI.
-     * @param clientId a client identifier that is unique on the server
-     *  			   being connected to
-     * @throw exception if an argument is invalid
-     */
-    explicit create_options(const string& serverURI, const string& clientId = string{})
-        : serverURI_{serverURI}, clientId_{clientId} {}
     /**
      * Create options for the specified server and client ID, with optional
      * persistence.
@@ -122,8 +127,9 @@ public:
      * @param persistence The desired persistence structure.
      * @throw exception if an argument is invalid
      */
-    create_options(
-        const string& serverURI, const string& clientId, const persistence_type& persistence
+    explicit create_options(
+        const string& serverURI, const string& clientId = string{},
+        const persistence_type& persistence = NO_PERSISTENCE
     )
         : serverURI_{serverURI}, clientId_{clientId}, persistence_{persistence} {}
     /**
@@ -141,7 +147,7 @@ public:
      */
     create_options(
         const string& serverURI, const string& clientId, int maxBufferedMessages,
-        const persistence_type& persistence
+        const persistence_type& persistence = NO_PERSISTENCE
     )
         : serverURI_{serverURI}, clientId_{clientId}, persistence_{persistence} {
         opts_.maxBufferedMessages = maxBufferedMessages;

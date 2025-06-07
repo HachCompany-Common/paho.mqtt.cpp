@@ -31,6 +31,7 @@ set(EXECUTABLES
     async_publish
     async_publish_time
     async_subscribe
+    async_subscribe_v5
     async_consume
     async_consume_v5
     async_message_consume
@@ -60,9 +61,8 @@ foreach(EXECUTABLE ${EXECUTABLES} ${SSL_EXECUTABLES})
     add_executable(${EXECUTABLE} ${EXECUTABLE}.cpp)
     target_link_libraries(${EXECUTABLE} PahoMqttCpp::paho-mqttpp3)
 
-    target_compile_features(${EXECUTABLE} PRIVATE cxx_std_17)
-
     set_target_properties(${EXECUTABLE} PROPERTIES
+        CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF
     )

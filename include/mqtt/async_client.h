@@ -15,7 +15,7 @@
 /////////////////////////////////////////////////////////////////////////////
 
 /*******************************************************************************
- * Copyright (c) 2013-2024 Frank Pagliughi <fpagliughi@mindspring.com>
+ * Copyright (c) 2013-2025 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v2.0
@@ -65,18 +65,18 @@ namespace mqtt {
 
 #if defined(PAHO_MQTTPP_VERSIONS)
 /** The version number for the client library. */
-const uint32_t PAHO_MQTTPP_VERSION = 0x01050000;
+const uint32_t PAHO_MQTTPP_VERSION = 0x01050003;
 /** The version string for the client library  */
-const string PAHO_MQTTPP_VERSION_STR("Paho MQTT C++ (mqttpp) v. 1.5.0");
+const string PAHO_MQTTPP_VERSION_STR("Paho MQTT C++ (mqttpp) v. 1.5.3");
 /** Copyright notice for the client library */
-const string PAHO_MQTTPP_COPYRIGHT("Copyright (c) 2013-2024 Frank Pagliughi");
+const string PAHO_MQTTPP_COPYRIGHT("Copyright (c) 2013-2025 Frank Pagliughi");
 #else
 /** The version number for the client library. */
-const uint32_t VERSION = 0x01050000;
+const uint32_t VERSION = 0x01050003;
 /** The version string for the client library  */
-const string VERSION_STR("Paho MQTT C++ (mqttpp) v. 1.5.0");
+const string VERSION_STR("Paho MQTT C++ (mqttpp) v. 1.5.3");
 /** Copyright notice for the client library */
-const string COPYRIGHT("Copyright (c) 2013-2024 Frank Pagliughi");
+const string COPYRIGHT("Copyright (c) 2013-2025 Frank Pagliughi");
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
@@ -106,7 +106,7 @@ const string COPYRIGHT("Copyright (c) 2013-2024 Frank Pagliughi");
  * the server, but return immediately, before a response is received back
  * from the server.
  *
- * These methods return a `Token` to the caller which is akin to a C++
+ * These methods return a `token` to the caller which is akin to a C++
  * std::future. The caller can keep the Token, then use it later to block
  * until the asynchronous operation is complete and retrieve the result of
  * the operation, including any response from the server.
@@ -116,6 +116,22 @@ const string COPYRIGHT("Copyright (c) 2013-2024 Frank Pagliughi");
  * architecture, but is more complex in that it forces the user to avoid any
  * blocking operations and manually handle thread synchronization (since
  * the callbacks run in a separate thread managed by the library).
+ *
+ * Note that the numerous constructors pre-date the current, expansive,
+ * `create_options` structure. For a full set of create options, a
+ * builder can be used to specify the full set of options, then construct
+ * the client with those options, like this:
+ *
+ * @code
+ *     auto createOpts = mqtt::create_options_builder()
+ *                        .server_uri(serverURI)
+ *                        .send_while_disconnected()
+ *                        .max_buffered_messages(25)
+ *                        .delete_oldest_messages()
+ *                        .finalize();
+ *
+ *     mqtt::async_client cli(createOpts);
+ * @endcode
  */
 class async_client : public virtual iasync_client
 {
@@ -221,24 +237,12 @@ public:
      *  				as a URI.
      * @param clientId a client identifier that is unique on the server
      *  			   being connected to
-     * @throw exception if an argument is invalid
-     */
-    explicit async_client(const string& serverURI, const string& clientId = string{})
-        : async_client(serverURI, clientId, NO_PERSISTENCE) {}
-    /**
-     * Create an async_client that can be used to communicate with an MQTT
-     * server.
-     * This allows the caller to specify a user-defined persistence object,
-     * or use no persistence.
-     * @param serverURI the address of the server to connect to, specified
-     *  				as a URI.
-     * @param clientId a client identifier that is unique on the server
-     *  			   being connected to
      * @param persistence The persistence that the client should use.
      * @throw exception if an argument is invalid
      */
-    async_client(
-        const string& serverURI, const string& clientId, const persistence_type& persistence
+    explicit async_client(
+        const string& serverURI, const string& clientId = string{},
+        const persistence_type& persistence = NO_PERSISTENCE
     )
         : createOpts_{serverURI, clientId, persistence} {
         create();
@@ -258,7 +262,7 @@ public:
      */
     async_client(
         const string& serverURI, const string& clientId, int maxBufferedMessages,
-        const persistence_type& persistence = persistence_type{}
+        const persistence_type& persistence = NO_PERSISTENCE
     )
         : createOpts_{serverURI, clientId, maxBufferedMessages, persistence} {
         create();
@@ -277,7 +281,7 @@ public:
      */
     async_client(
         const string& serverURI, const string& clientId, const create_options& opts,
-        const persistence_type& persistence
+        const persistence_type& persistence = NO_PERSISTENCE
     )
         : createOpts_{serverURI, clientId, opts, persistence} {
         create();
@@ -368,8 +372,9 @@ public:
      * @throw exception for non security related problems
      * @throw security_exception for security related problems
      */
-    token_ptr connect(connect_options options, void* userContext, iaction_listener& cb)
-        override;
+    token_ptr connect(
+        connect_options options, void* userContext, iaction_listener& cb
+    ) override;
     /**
      *
      * @param userContext optional object used to pass context to the
@@ -542,7 +547,7 @@ public:
      */
     delivery_token_ptr publish(
         string_ref topic, const void* payload, size_t n, int qos, bool retained,
-		const properties &props=properties()
+        const properties& props = properties()
     ) override;
     /**
      * Publishes a message to a topic on the server
@@ -568,10 +573,10 @@ public:
      * @return token used to track and wait for the publish to complete. The
      *  	   token will be passed to callback methods if set.
      */
-    delivery_token_ptr publish(string_ref topic, binary_ref payload, int qos, bool retained,
-							   const properties &props=properties()
-							   )
-        override;
+    delivery_token_ptr publish(
+        string_ref topic, binary_ref payload, int qos, bool retained,
+        const properties& props = properties()
+    ) override;
     /**
      * Publishes a message to a topic on the server
      * @param topic The topic to deliver the message to
@@ -623,8 +628,9 @@ public:
      * @return token used to track and wait for the publish to complete. The
      *  	   token will be passed to callback methods if set.
      */
-    delivery_token_ptr publish(const_message_ptr msg, void* userContext, iaction_listener& cb)
-        override;
+    delivery_token_ptr publish(
+        const_message_ptr msg, void* userContext, iaction_listener& cb
+    ) override;
     /**
      * Subscribe to a topic, which may include wildcards.
      * @param topicFilter the topic to subscribe to, which can include
@@ -712,8 +718,9 @@ public:
      * @return token Used to track and wait for the unsubscribe to complete.
      *  	   The token will be passed to callback methods if set.
      */
-    token_ptr unsubscribe(const string& topicFilter, const properties& props = properties())
-        override;
+    token_ptr unsubscribe(
+        const string& topicFilter, const properties& props = properties()
+    ) override;
     /**
      * Requests the server unsubscribe the client from one or more topics.
      * @param topicFilters One or more topics to unsubscribe from. Each
@@ -792,7 +799,8 @@ public:
      * This clears the consumer queue, discarding any pending event.
      */
     void clear_consumer() override {
-        if (que_) que_->clear();
+        if (que_)
+            que_->clear();
     }
     /**
      * Determines if the consumer queue has been closed.
@@ -801,19 +809,15 @@ public:
      * @return @true if the consumer queue has been closed, @false
      *         otherwise.
      */
-    bool consumer_closed() noexcept override {
-        return !que_ || que_->closed();
-    }
+    bool consumer_closed() noexcept override { return !que_ || que_->closed(); }
     /**
      * Determines if the consumer queue is "done" (closed and empty).
-     * Once the queue is done, no more events can be added or removed fom
+     * Once the queue is done, no more events can be added or removed from
      * the queue.
      * @return @true if the consumer queue is closed and empty, @false
      *         otherwise.
      */
-    bool consumer_done() noexcept override {
-        return !que_ || que_->done();
-    }
+    bool consumer_done() noexcept override { return !que_ || que_->done(); }
     /**
      * Gets the number of events available for immediate consumption.
      * Note that this retrieves the number of "raw" events, not messages,
@@ -822,9 +826,7 @@ public:
      * as the event count may change between checking the size and actual retrieval.
      * @return the number of events in the queue.
      */
-    std::size_t consumer_queue_size() const override {
-        return (que_) ? que_->size() : 0;
-    }
+    std::size_t consumer_queue_size() const override { return (que_) ? que_->size() : 0; }
     /**
      * Read the next client event from the queue.
      * This blocks until a new message arrives.
@@ -835,8 +837,8 @@ public:
     /**
      * Try to read the next client event without blocking.
      * @param evt Pointer to the value to receive the event
-	 * @return @em true if an event was read, @em false if no
-	 *  	   event was available.
+     * @return @em true if an event was read, @em false if no
+     *  	   event was available.
      */
     bool try_consume_event(event* evt) override;
     /**
@@ -863,9 +865,9 @@ public:
     }
     /**
      * Waits a limited time for a client event to arrive.
-	 * @param relTime The maximum amount of time to wait for an event.
-	 * @return The event that was received. It will contain empty message on
-	 *  	   timeout.
+     * @param relTime The maximum amount of time to wait for an event.
+     * @return The event that was received. It will contain empty message on
+     *  	   timeout.
      */
     template <typename Rep, class Period>
     event try_consume_event_for(const std::chrono::duration<Rep, Period>& relTime) {
@@ -882,8 +884,8 @@ public:
      * Waits until a specific time for a client event to appear.
      * @param evt Pointer to the value to receive the event.
      * @param absTime The time point to wait until, before timing out.
-	 * @return @em true if an event was recceived, @em false if a timeout
-	 *  	   occurred.
+     * @return @em true if an event was recceived, @em false if a timeout
+     *  	   occurred.
      */
     template <class Clock, class Duration>
     bool try_consume_event_until(
@@ -902,13 +904,12 @@ public:
     }
     /**
      * Waits until a specific time for a client event to appear.
-	 * @param absTime The time point to wait until, before timing out.
-	 * @return The event that was received. It will contain empty message on
-	 *  	   timeout.
+     * @param absTime The time point to wait until, before timing out.
+     * @return The event that was received. It will contain empty message on
+     *  	   timeout.
      */
     template <class Clock, class Duration>
-    event try_consume_event_until(const std::chrono::time_point<Clock, Duration>& absTime
-    ) {
+    event try_consume_event_until(const std::chrono::time_point<Clock, Duration>& absTime) {
         event evt;
         try {
             que_->try_get_until(&evt, absTime);
@@ -948,20 +949,20 @@ public:
 
         event evt;
 
-		while (true) {
-			if (!try_consume_event_for(&evt, relTime))
-				return false;
+        while (true) {
+            if (!try_consume_event_for(&evt, relTime))
+                return false;
 
-			if (const auto* pval = evt.get_message_if()) {
-				*msg = std::move(*pval);
-				break;
-			}
+            if (const auto* pval = evt.get_message_if()) {
+                *msg = std::move(*pval);
+                break;
+            }
 
-			if (evt.is_any_disconnect()) {
-				*msg = const_message_ptr{};
-				break;
-			}
-		}
+            if (evt.is_any_disconnect()) {
+                *msg = const_message_ptr{};
+                break;
+            }
+        }
         return true;
     }
     /**
@@ -994,20 +995,20 @@ public:
 
         event evt;
 
-		while (true) {
-			if (!try_consume_event_until(&evt, absTime))
-				return false;
+        while (true) {
+            if (!try_consume_event_until(&evt, absTime))
+                return false;
 
-			if (const auto* pval = evt.get_message_if()) {
-				*msg = std::move(*pval);
-				break;
-			}
+            if (const auto* pval = evt.get_message_if()) {
+                *msg = std::move(*pval);
+                break;
+            }
 
-			if (!evt.is_any_disconnect()) {
-				*msg = const_message_ptr{};
-				break;
-			}
-		}
+            if (!evt.is_any_disconnect()) {
+                *msg = const_message_ptr{};
+                break;
+            }
+        }
 
         return true;
     }

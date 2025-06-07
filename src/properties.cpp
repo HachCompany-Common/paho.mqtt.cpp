@@ -215,8 +215,15 @@ std::ostream& operator<<(std::ostream& os, const property& prop)
 
         case MQTTPROPERTY_TYPE_BINARY_DATA: {
             auto bin = get<binary>(prop);
-            for (const char& by : bin) os << std::hex << unsigned(by);
-            os << std::dec;
+            auto n = bin.size();
+            os << '[';
+            if (n > 0) {
+                os << std::hex;
+                for (size_t i = 0; i < n - 1; ++i) os << "0x" << unsigned(bin[i]) << ", ";
+                os << "0x" << unsigned(bin[n - 1]);
+                os << std::dec;
+            }
+            os << ']';
         } break;
 
         case MQTTPROPERTY_TYPE_UTF_8_ENCODED_STRING:

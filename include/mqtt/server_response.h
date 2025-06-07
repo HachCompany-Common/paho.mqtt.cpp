@@ -154,7 +154,7 @@ public:
      * was sent in the subscribe packet. Each tells the granted QoS
      * for the corresponding topic.
      *
-     * For MQTT v5 values over 0x80 are error codes as descibed in the MQTT
+     * For MQTT v5 values over 0x80 are error codes as described in the MQTT
      * v5 spec.
      *
      * @return A collection of return/reason codes corresponding to

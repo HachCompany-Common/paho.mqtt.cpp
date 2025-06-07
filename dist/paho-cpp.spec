@@ -1,8 +1,8 @@
 Summary:            MQTT CPP Client
 Name:               paho-cpp
-Version:            1.0.0
+Version:            1.5.3
 Release:            0%{?dist}
-License:            Eclipse Distribution License 1.0 and Eclipse Public License 1.0
+License:            Eclipse Eclipse Public License 2.0 and Distribution License 1.0
 Group:              Development/Tools
 Source:             https://github.com/eclipse/paho.mqtt.cpp/archive/v%{version}.tar.gz
 URL:                https://eclipse.org/paho/clients/cpp/
@@ -17,7 +17,7 @@ Requires:           paho-c
 
 
 %description
-The Paho MQTT CPP Client is a fully fledged MQTT client written in ANSI standard C++ 11.
+The Paho MQTT CPP Client is a fully fledged MQTT client written in ANSI standard C++ 17.
 
 
 %package devel
@@ -41,7 +41,7 @@ Development documentation files for the the Paho MQTT CPP Client.
 
 %build
 mkdir build.paho.cpp && cd build.paho.cpp
-%cmake3 -DPAHO_WITH_SSL=TRUE -DPAHO_BUILD_DOCUMENTATION=TRUE -DPAHO_BUILD_SAMPLES=TRUE ..
+%cmake3 -DPAHO_WITH_SSL=TRUE -DPAHO_BUILD_DOCUMENTATION=TRUE -DPAHO_BUILD_EXAMPLES=TRUE ..
 make %{?_smp_mflags}
 
 %install

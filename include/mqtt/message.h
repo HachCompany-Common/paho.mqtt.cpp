@@ -64,6 +64,10 @@ public:
 private:
     /** Initializer for the C struct (from the C library) */
     static constexpr MQTTAsync_message DFLT_C_STRUCT MQTTAsync_message_initializer;
+    /** A const string to use for references */
+    PAHO_MQTTPP_EXPORT static const string EMPTY_STR;
+    /** A const binary to use for references */
+    PAHO_MQTTPP_EXPORT static const binary EMPTY_BIN;
 
     /** The underlying C message struct */
     MQTTAsync_message msg_{DFLT_C_STRUCT};
@@ -258,10 +262,7 @@ public:
      * Gets the topic for the message.
      * @return The topic string for the message.
      */
-    const string& get_topic() const {
-        static const string EMPTY_STR;
-        return topic_ ? topic_.str() : EMPTY_STR;
-    }
+    const string& get_topic() const { return topic_ ? topic_.str() : EMPTY_STR; }
     /**
      * Clears the payload, resetting it to be empty.
      */
@@ -273,17 +274,11 @@ public:
     /**
      * Gets the payload
      */
-    const binary& get_payload() const {
-        static const binary EMPTY_BIN;
-        return payload_ ? payload_.str() : EMPTY_BIN;
-    }
+    const binary& get_payload() const { return payload_ ? payload_.str() : EMPTY_BIN; }
     /**
      * Gets the payload as a string
      */
-    const string& get_payload_str() const {
-        static const string EMPTY_STR;
-        return payload_ ? payload_.str() : EMPTY_STR;
-    }
+    const string& get_payload_str() const { return payload_ ? payload_.str() : EMPTY_STR; }
     /**
      * Returns the quality of service for this message.
      * @return The quality of service for this message.
@@ -388,7 +383,7 @@ using const_message_ptr = message::const_ptr_t;
  */
 inline message_ptr make_message(
     string_ref topic, const void* payload, size_t len, int qos, bool retained,
-	const properties& props = properties()
+    const properties& props = properties()
 ) {
     return mqtt::message::create(std::move(topic), payload, len, qos, retained, props);
 }
@@ -413,7 +408,7 @@ inline message_ptr make_message(string_ref topic, const void* payload, size_t le
  */
 inline message_ptr make_message(
     string_ref topic, binary_ref payload, int qos, bool retained,
-	const properties& props = properties()
+    const properties& props = properties()
 ) {
     return mqtt::message::create(std::move(topic), std::move(payload), qos, retained, props);
 }

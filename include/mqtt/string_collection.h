@@ -261,7 +261,7 @@ using const_string_collection_ptr = string_collection::const_ptr_t;
 /////////////////////////////////////////////////////////////////////////////
 
 /**
- * A colleciton of name/value string pairs.
+ * A collection of name/value string pairs.
  */
 class name_value_collection
 {

@@ -2,7 +2,7 @@
 // Implementation of the client class for the mqtt C++ client library.
 
 /*******************************************************************************
- * Copyright (c) 2013-2017 Frank Pagliughi <fpagliughi@mindspring.com>
+ * Copyright (c) 2013-2025 Frank Pagliughi <fpagliughi@mindspring.com>
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v2.0
@@ -33,21 +33,16 @@ PAHO_MQTTPP_EXPORT const int client::DFLT_QOS = 1;
 // --------------------------------------------------------------------------
 
 client::client(
-    const string& serverURI, const string& clientId,
-    iclient_persistence* persistence /*=nullptr*/
+    const string& serverURI, const string& clientId /*=string{}*/,
+    const persistence_type& persistence /*=NO_PERSISTENCE*/
 )
     : cli_(serverURI, clientId, persistence), timeout_(DFLT_TIMEOUT), userCallback_(nullptr)
 {
 }
 
-client::client(const string& serverURI, const string& clientId, const string& persistDir)
-    : cli_(serverURI, clientId, persistDir), timeout_(DFLT_TIMEOUT), userCallback_(nullptr)
-{
-}
-
 client::client(
     const string& serverURI, const string& clientId, int maxBufferedMessages,
-    iclient_persistence* persistence /*=nullptr*/
+    const persistence_type& persistence /*=NO_PERSISTENCE*/
 )
     : cli_(serverURI, clientId, maxBufferedMessages, persistence),
       timeout_(DFLT_TIMEOUT),
@@ -56,22 +51,17 @@ client::client(
 }
 
 client::client(
-    const string& serverURI, const string& clientId, int maxBufferedMessages,
-    const string& persistDir
+    const string& serverURI, const string& clientId, const create_options& opts,
+    const persistence_type& persistence /*=NO_PERSISTENCE*/
 )
-    : cli_(serverURI, clientId, maxBufferedMessages, persistDir),
+    : cli_(serverURI, clientId, opts, persistence),
       timeout_(DFLT_TIMEOUT),
       userCallback_(nullptr)
 {
 }
 
-client::client(
-    const string& serverURI, const string& clientId, const create_options& opts,
-    iclient_persistence* persistence /*=nullptr*/
-)
-    : cli_(serverURI, clientId, opts, persistence),
-      timeout_(DFLT_TIMEOUT),
-      userCallback_(nullptr)
+client::client(const create_options& opts)
+    : cli_(opts), timeout_(DFLT_TIMEOUT), userCallback_(nullptr)
 {
 }
 
