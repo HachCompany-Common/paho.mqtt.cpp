@@ -5,7 +5,7 @@
 #*******************************************************************************
 # This is part of the Paho MQTT C++ client library.
 #
-# Copyright (c) 2017-2025, Frank Pagliughi
+# Copyright (c) 2017-2026, Frank Pagliughi
 # Copyright (c) 2016-2017, Guilherme Maciel Ferreira
 #
 # All rights reserved. This program and the accompanying materials
@@ -24,7 +24,7 @@
 
 cmake_minimum_required(VERSION 3.13)
 
-project(PahoMqttCpp VERSION "1.5.4")
+project(PahoMqttCpp VERSION "1.6.0")
 
 ## --- Build options ---
 
@@ -73,7 +73,7 @@ if(PAHO_WITH_MQTT_C)
     endif()
     set(CMAKE_C_STANDARD 99 CACHE STRING "Paho C language standard")
 
-    add_subdirectory(${PROJECT_SOURCE_DIR}/externals/paho-mqtt-c)
+    add_subdirectory(${PROJECT_SOURCE_DIR}/externals/paho.mqtt.c)
 
     ## Alias namespace so that the full names can be used with the subdir.
     if(PAHO_BUILD_SHARED)
@@ -102,7 +102,10 @@ if(PAHO_WITH_MQTT_C)
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
 else()
-    find_package(eclipse-paho-mqtt-c REQUIRED)
+    find_package(eclipse-paho-mqtt-c 1.3.14 REQUIRED)
+    if(eclipse-paho-mqtt-c_FOUND)
+        message(STATUS "Found Paho C v${eclipse-paho-mqtt-c_VERSION}")
+    endif()
 endif()
 
 # --- System Details ---

@@ -59,24 +59,24 @@
 
 namespace mqtt {
 
+/** The version number for the client library. */
+const uint32_t PAHO_MQTTPP_VERSION = 0x01060000;
+/** The version string for the client library  */
+const string PAHO_MQTTPP_VERSION_STR("Paho MQTT C++ (mqttpp) v1.6.0");
+/** Copyright notice for the client library */
+const string PAHO_MQTTPP_COPYRIGHT("Copyright (c) 2013-2026 Frank Pagliughi");
+
 // OBSOLETE: The legacy constants that lacked the "PAHO_MQTTPP_" prefix
 // clashed with #define's from other libraries and will be removed at the
 // next major version upgrade.
 
-#if defined(PAHO_MQTTPP_VERSIONS)
+#if !defined(PAHO_MQTTPP_VERSIONS)
 /** The version number for the client library. */
-const uint32_t PAHO_MQTTPP_VERSION = 0x01050004;
+const uint32_t VERSION{PAHO_MQTTPP_VERSION};
 /** The version string for the client library  */
-const string PAHO_MQTTPP_VERSION_STR("Paho MQTT C++ (mqttpp) v. 1.5.4");
+const string VERSION_STR{PAHO_MQTTPP_VERSION_STR};
 /** Copyright notice for the client library */
-const string PAHO_MQTTPP_COPYRIGHT("Copyright (c) 2013-2025 Frank Pagliughi");
-#else
-/** The version number for the client library. */
-const uint32_t VERSION = 0x01050004;
-/** The version string for the client library  */
-const string VERSION_STR("Paho MQTT C++ (mqttpp) v. 1.5.4");
-/** Copyright notice for the client library */
-const string COPYRIGHT("Copyright (c) 2013-2025 Frank Pagliughi");
+const string COPYRIGHT{PAHO_MQTTPP_COPYRIGHT};
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
@@ -542,6 +542,7 @@ public:
      *  		  values are 0, 1 or 2.
      * @param retained whether or not this message should be retained by the
      *  			   server.
+     * @param props The MQTT v5 properties for the message.
      * @return token used to track and wait for the publish to complete. The
      *  	   token will be passed to callback methods if set.
      */
@@ -570,6 +571,7 @@ public:
      *  		  values are 0, 1 or 2.
      * @param retained whether or not this message should be retained by the
      *  			   server.
+     * @param props The MQTT v5 properties for the message.
      * @return token used to track and wait for the publish to complete. The
      *  	   token will be passed to callback methods if set.
      */
@@ -806,7 +808,7 @@ public:
      * Determines if the consumer queue has been closed.
      * Once closed, any events in the queue can still be read, but no new
      * events can be added to it.
-     * @return @true if the consumer queue has been closed, @false
+     * @return @em true if the consumer queue has been closed, @em false
      *         otherwise.
      */
     bool consumer_closed() noexcept override { return !que_ || que_->closed(); }
@@ -814,7 +816,7 @@ public:
      * Determines if the consumer queue is "done" (closed and empty).
      * Once the queue is done, no more events can be added or removed from
      * the queue.
-     * @return @true if the consumer queue is closed and empty, @false
+     * @return @em true if the consumer queue is closed and empty, @em false
      *         otherwise.
      */
     bool consumer_done() noexcept override { return !que_ || que_->done(); }
